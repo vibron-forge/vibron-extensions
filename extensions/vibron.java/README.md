@@ -22,8 +22,10 @@ format is described in Vibron's
   download, with TCK-certified Temurin builds of every LTS for every major OS
   (java.com serves Oracle's end-user Java 8 runtime, not a development kit).
 - A Vibron build with language contributions (M5.5.19). The extension must be
-  installed from the catalog, enabled, and approved in Settings › Extensions,
-  which shows the exact commands before anything runs.
+  installed from a trusted catalog (the official one is trusted by default;
+  another is trusted in Settings › Extensions, never a plain `http://` one),
+  enabled, and approved in Settings › Extensions, which shows the catalog, the
+  artifact's sha256 and the exact commands before anything runs.
 
 ## What the test runners run
 
@@ -48,6 +50,7 @@ The filter is Surefire's `-Dtest` (`Class`, `Class#method`) or Gradle's
 | --- | --- |
 | A test fails | `failed`, at the test's own line |
 | A test class's setup fails (a throwing `@BeforeAll`/`@BeforeClass`) under Maven | `setup-failed`: Surefire reports it as the class's only case, `initializationError` (or, before Surefire 3.6, a case with an empty name for JUnit 4), which the Maven core extension turns into a suite failure |
+| A test class's setup fails under Gradle | `setup-failed`: Gradle writes the class as a case named `initializationError` (JUnit Platform) or `classMethod` (JUnit 4), which Vibron's JUnit XML reader reads as the class |
 | Maven fails before Surefire runs (test sources that do not compile, a dependency that does not resolve) | `setup-failed`, with Maven's message, written as `TEST-vibron-setup-<n>.xml` |
 | The Gradle test worker dies (`System.exit`, a JVM crash) | `crashed` with unknown counts: Gradle writes no XML |
 | No report at all (no tests, or the filter matched nothing) | `crashed`, never `passed` |
@@ -70,16 +73,11 @@ committed.
   a bare executable started without a shell. A server comes in a later version,
   verified against the M5.5.21 that is integrated, with a new approval.
 - Runs on remote workspaces (WSL/SSH): the runner executes on the local host.
-- Gradle reports a class whose setup failed as a failed `initializationError`
-  (JUnit Platform) or `classMethod` (JUnit 4) case; only the Maven side lifts
-  it to a suite failure.
-- A multi-module build writes every module's reports into one directory, so two
-  modules with a test class of the same name overwrite each other's report.
+- A multi-module Maven build writes every module's reports into one directory,
+  so two modules with a test class of the same name overwrite each other's
+  report.
 - A Surefire fork that dies after some classes finished leaves their reports,
   so that run ends `failed` rather than `crashed`.
-- Before Surefire 3.6, a JUnit 4 class-level `@Ignore` is a case with an empty
-  name, which the core's JUnit XML reader refuses, so the whole run ends
-  `crashed` until that reader accepts it.
 - The contract carries one official site per language, so a missing `mvn` or
   `gradle` also points to the Java download rather than to maven.apache.org or
   gradle.org.
