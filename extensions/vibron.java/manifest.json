@@ -9,6 +9,7 @@
         "id": "java",
         "name": "Java",
         "detect": {
+          "extensions": [".java"],
           "markers": ["pom.xml", "build.gradle", "build.gradle.kts", "settings.gradle", "settings.gradle.kts"]
         },
         "toolchain": {
@@ -51,7 +52,7 @@
           }
         ],
         "recommend": {
-          "on": ["project-open"]
+          "on": ["file-open", "project-open"]
         }
       }
     ]
