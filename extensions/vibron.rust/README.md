@@ -54,5 +54,8 @@ refuses it.
 - Runs on remote workspaces (WSL/SSH): the runner executes on the local host.
 - The test binary's name: `cargo test` does not write it in the stream, so two
   tests with the same name in different targets are told apart by suite order
-  (`rust/suite-3/<test>`).
+  (`rust/suite-3/<test>`). cargo-nextest's libtest JSON names the target, but
+  nextest 0.9.146 reports an `#[ignore]`d test only as started and the core
+  refuses that stream, so this extension runs `cargo test` (see the guide's
+  Cargo section).
 - Targets with `harness = false` that do not write libtest JSON are not listed.
