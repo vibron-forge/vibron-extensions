@@ -3,7 +3,7 @@
   "name": "Rust",
   "version": "0.1.0",
   "category": "development",
-  "description": "Runs Rust tests in Vibron with the Rust installed on this machine: a crate that does not compile, failing tests and ignored tests stay distinct, and nothing is downloaded.",
+  "description": "Runs Rust tests in Vibron with the Rust installed on this machine: a crate that does not compile, failing tests and ignored tests stay distinct. It never downloads a Rust toolchain.",
   "contributes": {
     "languages": [
       {
@@ -22,7 +22,9 @@
           "command": "cargo",
           "args": ["test", "--no-fail-fast"],
           "env": {
-            "RUSTC_BOOTSTRAP": "1"
+            "RUSTC_BOOTSTRAP": "0",
+            "RUSTUP_AUTO_INSTALL": "0",
+            "RUST_TEST_NOCAPTURE": "0"
           },
           "report": {
             "format": "libtest-json",
