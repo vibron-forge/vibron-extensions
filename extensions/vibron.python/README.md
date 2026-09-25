@@ -15,31 +15,31 @@ manifest format is described in Vibron's
   `python -m pip install pytest` in the environment you test with). The tests
   run with the Python that `pytest` belongs to. Without `pytest`, a run ends
   `crashed` and points to <https://www.python.org/downloads/>.
-- A Vibron build with language contributions (M5.5.19). The extension must be
-  installed from the catalog, enabled, and approved in Settings › Extensions,
-  which shows the exact command before anything runs.
+- A Vibron build with language contributions (M5.5.19). The extension must come
+  from a trusted catalog (the official one, or a source marked trusted in
+  Settings › Extensions), be installed, enabled, and approved in Settings ›
+  Extensions, which shows the catalog, the artifact's sha256 and the exact
+  command before anything runs.
 
 ## What the test runner runs
 
 ```
-PYTHONPATH=<extension>/python PYTEST_ADDOPTS= PYTHONDONTWRITEBYTECODE=1 PY_COLORS=0 pytest -p vibron_pytest -p no:cacheprovider -o junit_family=xunit2 [your args] [--vibron-select=<filter>] --junitxml=<run report>
+PYTHONPATH=<extension>/python PYTEST_ADDOPTS="" PYTHONDONTWRITEBYTECODE=1 PY_COLORS=0 pytest -p vibron_pytest -p no:cacheprovider -o junit_family=xunit2 [your args] [-k <filter>] --junitxml=<run report>
 ```
 
 | Part | Why |
 | --- | --- |
 | `--junitxml`, `-o junit_family=xunit2` | The report Vibron reads, in a file the run owns. `legacy`/`xunit1` count lines from zero. |
-| `-p vibron_pytest` | Adds each test's file to the report (`xunit2` leaves it out) and the exact `--vibron-select`. |
+| `-p vibron_pytest` | Adds each test's file to the report (`xunit2` leaves it out), so a case keeps its file in its id and opens in the editor. |
 | `-p no:cacheprovider` | No `.pytest_cache` is written into your project. |
 | `PYTHONDONTWRITEBYTECODE=1` | No `__pycache__` in your project or in the installed extension. |
 | `PY_COLORS=0` | Plain text even when `FORCE_COLOR` or `PY_COLORS=1` is set: pytest otherwise writes color codes into the report's failure text, which hides the failing line. |
 | `PYTEST_ADDOPTS=` (empty) | Your `PYTEST_ADDOPTS` cannot change the report or the selection behind the run's back. Keep options in `pytest.ini`/`pyproject.toml` or pass them as arguments. |
 
-Pass paths or node ids as arguments (`tests`, `tests/test_calc.py::test_add`),
-and pytest's own `-k`/`-m` expressions too. The filter is exact:
-`--vibron-select` keeps only the test whose node id, or whose name as Vibron
-shows it (`tests.test_calc.test_add`, `test_calc.TestAdd.test_same[a&b]`), is
-the filter. "Rerun this test" uses it, so a rerun never picks up another test
-whose name merely contains that one.
+Pass paths or node ids as arguments (`tests`, `tests/test_calc.py::test_add`).
+The filter is a pytest `-k` expression (`test_add`, `TestCalc and not slow`),
+as Vibron's contract defines it for every language: it is not the id or the
+full name of a case from the results.
 
 ## How runs end
 
@@ -57,6 +57,8 @@ whose name merely contains that one.
 - Autocompletion, errors and go to definition from a Python language server
   (Vibron M5.5.21).
 - Runs on remote workspaces (WSL/SSH): the runner executes on the local host.
+- Rerunning one case from the results: Vibron's contract has no exact case
+  selection yet, so the Test runs panel only repeats the whole run.
 - A run replaces `PYTHONPATH` with the plugin folder, because the contract
   replaces whole variables. Set import paths with pytest's `pythonpath` option
   in `pytest.ini`/`pyproject.toml` instead.
