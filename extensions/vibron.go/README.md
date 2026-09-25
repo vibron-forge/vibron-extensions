@@ -31,7 +31,7 @@ GOFLAGS= GOTOOLCHAIN=local go test -json -count=1 -fullpath [your args] [-run <f
 | `-count=1` | Always runs the tests; a cached result is not a new verdict. |
 | `-fullpath` | Failures carry the whole path, so two packages with a `calc_test.go` are not confused. |
 | `GOTOOLCHAIN=local` | Never downloads a newer Go: a `go.mod` that asks for one fails the run and says so. |
-| `GOFLAGS=` (empty) | Your `GOFLAGS` cannot add `-run`, `-list` or `-json=false` behind the run's back. Pass build flags such as `-tags` as arguments instead. |
+| `GOFLAGS=` (empty) | Drops a `GOFLAGS` inherited from the environment, so it cannot add `-run` or `-list` behind the run's back. A `GOFLAGS` saved with `go env -w` still applies, as in your terminal: Go reads it when the variable is empty. Pass build flags such as `-tags` as arguments instead. |
 
 Pass the packages as arguments (`./...` for the whole module). The filter is
 Go's `-run` regular expression.
