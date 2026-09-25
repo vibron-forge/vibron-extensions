@@ -35,7 +35,7 @@ gradle test --init-script <extension>/dist/gradle/vibron.init.gradle [your args]
 | Part | Why |
 | --- | --- |
 | `vibron-surefire-reports.jar` | A Maven core extension. Surefire has no command-line property for its `reportsDirectory`, so it points the plugin and each of its executions at `vibron.reportsDirectory`. When the session ends it writes what kept tests from running in the shape JUnit XML gives a suite that failed outside any test (a `<failure>`/`<error>` directly under `<testsuite>`). Without `vibron.reportsDirectory` it does nothing, and it never changes the build's outcome. |
-| `vibron.init.gradle` | Points the JUnit XML of every `Test` task at `vibron.reportsDirectory`, and makes the task never up to date and never restored from the build cache, so every run is a new verdict (with `--build-cache` or `org.gradle.caching=true`, the recipe alone replayed `:test FROM-CACHE`). |
+| `vibron.init.gradle` | Points the JUnit XML of each `Test` task at its own folder under `vibron.reportsDirectory` (`test`, `integrationTest`, `app.test`…): Gradle deletes the `TEST*.xml` of its output folder before writing, so in a shared folder one task erased the others' reports. Writes a rerun (the `test-retry` plugin) into the same case (`mergeReruns`), which Vibron counts as an attempt. Makes the task never up to date and never restored from the build cache, so every run is a new verdict (with `--build-cache` or `org.gradle.caching=true`, a run replayed `:test FROM-CACHE` without running the tests). |
 | `<run directory>` | Created empty by Vibron for each run, so a run reads only its own reports. |
 | `--batch-mode` | No prompts and no colour codes in the log. |
 

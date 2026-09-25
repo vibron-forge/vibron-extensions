@@ -1,11 +1,14 @@
 def directory = gradle.startParameter.projectProperties['vibron.reportsDirectory']
 if (directory) {
     allprojects {
-        tasks.withType(Test).configureEach {
-            reports.junitXml.outputLocation.set(new File(directory))
+        tasks.withType(Test).configureEach { Test task ->
+            // One folder per Test task (test, integrationTest, app.test...): Gradle deletes the TEST*.xml of its output folder before writing.
+            def owner = task.project.path == ':' ? '' : task.project.path.substring(1).replace(':', '.') + '.'
+            task.reports.junitXml.outputLocation.set(new File(directory, owner + task.name))
+            task.reports.junitXml.mergeReruns.set(true)
             // Every run is a new verdict: never up to date, never restored from the build cache.
-            outputs.upToDateWhen(org.gradle.api.specs.Specs.satisfyNone())
-            outputs.doNotCacheIf('Vibron reads a new verdict from every run', org.gradle.api.specs.Specs.satisfyAll())
+            task.outputs.upToDateWhen(org.gradle.api.specs.Specs.satisfyNone())
+            task.outputs.doNotCacheIf('Vibron reads a new verdict from every run', org.gradle.api.specs.Specs.satisfyAll())
         }
     }
 }
