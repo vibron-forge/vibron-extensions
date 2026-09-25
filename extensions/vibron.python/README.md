@@ -11,10 +11,11 @@ manifest format is described in Vibron's
 
 ## Requirements
 
-- Python 3 with pytest 7 or newer, and `pytest` on `PATH` (for example
+- Python 3 with pytest, and `pytest` on `PATH` (for example
   `python -m pip install pytest` in the environment you test with). The tests
   run with the Python that `pytest` belongs to. Without `pytest`, a run ends
-  `crashed` and points to <https://www.python.org/downloads/>.
+  `crashed` and points to <https://www.python.org/downloads/>. Verified with
+  pytest 9.1.1 on Python 3.14.2; older pytest versions are untested.
 - A Vibron build with language contributions (M5.5.19). The extension must come
   from a trusted catalog (the official one, or a source marked trusted in
   Settings › Extensions), be installed, enabled, and approved in Settings ›
@@ -39,10 +40,13 @@ PYTHONPATH=<extension>/python PYTEST_ADDOPTS="" PYTHONDONTWRITEBYTECODE=1 PY_COL
 Pass paths or node ids as arguments (`tests`, `tests/test_calc.py::test_add`).
 The filter is a pytest `-k` expression (`test_add`, `TestCalc and not slow`),
 the tool's own syntax as Vibron's contract defines it. When the filter is
-exactly one test's node id (`tests/test_calc.py::TestAdd::test_same[a&b]`) or
-its name as Vibron shows it (`tests.test_calc.TestAdd.test_same[a&b]`), the
-plugin runs that test alone: pytest's own `-k` would match nothing for such a
-value, or reject it for its `&`, spaces or brackets.
+exactly one test's node id, relative to pytest's rootdir (the `rootdir:` line
+pytest prints; `tests/test_calc.py::TestAdd::test_same[a&b]`), or its name as
+Vibron shows it (`tests.test_calc.TestAdd.test_same[a&b]`), the plugin runs
+that test alone: pytest's own `-k` would match nothing for such a value, or
+reject it for its `&`, spaces or brackets. A node id written relative to
+another folder selects nothing (pytest exits 5); the name Vibron shows always
+works.
 
 ## How runs end
 
@@ -50,7 +54,9 @@ value, or reject it for its `&`, spaces or brackets.
 | --- | --- |
 | Every selected test passes | `passed` |
 | A test fails, or errors in a fixture | `failed`, with the failing line |
-| Every selected test is skipped | `skipped`, never `passed` |
+| A fixture errors in teardown, even after its test passed | `failed` |
+| Every selected test is skipped, or an expected failure (`xfail`) | `skipped`, never `passed` |
+| An `xfail` test passes (XPASS) | `passed`; with `strict=True`, `failed` |
 | The filter or the arguments select no test (pytest exits 5) | `failed`, 0 tests |
 | The interpreter dies mid-run (`os._exit`, a crash) and writes no report | `crashed`, counts unknown |
 | You cancel | `cancelled` |
