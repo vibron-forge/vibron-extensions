@@ -8,14 +8,21 @@ reads the JUnit XML reports with the core's `junit-xml` reader. The manifest
 format is described in Vibron's
 [`docs/extensions/language-contributions.md`](https://github.com/vibron-forge/vibron/blob/staging/docs/extensions/language-contributions.md).
 
-| Language | Detected by |
+One language, `java`, detected by any of the marker files below, with one test
+runner per build tool:
+
+| Test runner | Chosen when the run's folder has |
 | --- | --- |
-| `java-maven` | `pom.xml` |
-| `java-gradle` | `build.gradle`, `build.gradle.kts`, `settings.gradle`, `settings.gradle.kts` |
+| `maven` | `pom.xml` |
+| `gradle` | `build.gradle`, `build.gradle.kts`, `settings.gradle`, `settings.gradle.kts` |
+
+A run uses the runner its caller names (`"runner": "gradle"`) or else the first
+one, in this order, whose marker file is in the run's folder; with neither,
+Vibron refuses the run and lists the markers it looked for.
 
 ## Requirements
 
-- A JDK and Maven 3.9 (for `java-maven`) or Gradle 8 (for `java-gradle`) on
+- A JDK and Maven 3.9 (for `maven`) or Gradle 8 (for `gradle`) on
   `PATH`. The wrappers (`./mvnw`, `./gradlew`) are paths, which a contributed
   command cannot be. Without the command, a run ends `crashed` and points to
   <https://adoptium.net/>: the Eclipse Foundation's vendor-neutral OpenJDK
