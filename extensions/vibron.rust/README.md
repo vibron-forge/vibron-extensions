@@ -97,3 +97,7 @@ path dependency whose build script has the same logic:
   refuses that stream, so this extension runs `cargo test` (see the guide's
   Cargo section).
 - Targets with `harness = false` that do not write libtest JSON are not listed.
+- Opening a failure from a workspace member: in a Cargo workspace, the
+  `file:line` of a failure is relative to the workspace root (the path Cargo
+  gives rustc), so Vibron finds the file only for runs started from the
+  workspace root. Narrow those with `--package <name>`.
