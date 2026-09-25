@@ -1,0 +1,60 @@
+{
+  "id": "vibron.java",
+  "name": "Java",
+  "version": "0.1.0",
+  "category": "development",
+  "contributes": {
+    "languages": [
+      {
+        "id": "java",
+        "name": "Java",
+        "detect": {
+          "extensions": [".java"],
+          "markers": ["pom.xml", "build.gradle", "build.gradle.kts", "settings.gradle", "settings.gradle.kts"]
+        },
+        "toolchain": {
+          "command": "java",
+          "versionArgs": ["-version"],
+          "officialSite": "https://adoptium.net/"
+        },
+        "testRunners": [
+          {
+            "id": "maven",
+            "when": {
+              "markers": ["pom.xml"]
+            },
+            "command": "mvn",
+            "args": ["test", "--batch-mode", "-Dmaven.ext.class.path=${extensionDir}/dist/maven/vibron-surefire-reports.jar"],
+            "report": {
+              "format": "junit-xml",
+              "source": "directory",
+              "args": ["-Dvibron.reportsDirectory=${reportDir}"]
+            },
+            "filter": {
+              "args": ["-Dtest=${filter}"]
+            }
+          },
+          {
+            "id": "gradle",
+            "when": {
+              "markers": ["build.gradle", "build.gradle.kts", "settings.gradle", "settings.gradle.kts"]
+            },
+            "command": "gradle",
+            "args": ["test", "--init-script", "${extensionDir}/dist/gradle/vibron.init.gradle"],
+            "report": {
+              "format": "junit-xml",
+              "source": "directory",
+              "args": ["-Pvibron.reportsDirectory=${reportDir}"]
+            },
+            "filter": {
+              "args": ["--tests=${filter}"]
+            }
+          }
+        ],
+        "recommend": {
+          "on": ["file-open", "project-open"]
+        }
+      }
+    ]
+  }
+}

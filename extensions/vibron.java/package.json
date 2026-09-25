@@ -1,0 +1,9 @@
+{
+  "name": "vibron.java",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Java for Vibron: Maven and Gradle test runners on the Java installed on the machine.",
+  "scripts": {
+    "build": "node build.mjs"
+  }
+}
