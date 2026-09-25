@@ -1,7 +1,7 @@
 {
   "id": "vibron.python",
   "name": "Python",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "category": "development",
   "description": "Runs Python tests in Vibron with pytest on the Python installed on this machine: passed, failed, skipped and crashed runs stay distinct, a skip never counts as a pass, and nothing is downloaded.",
   "contributes": {

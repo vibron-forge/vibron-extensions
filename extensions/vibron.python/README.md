@@ -30,7 +30,7 @@ PYTHONPATH=<extension>/python PYTEST_ADDOPTS="" PYTHONDONTWRITEBYTECODE=1 PY_COL
 | Part | Why |
 | --- | --- |
 | `--junitxml`, `-o junit_family=xunit2` | The report Vibron reads, in a file the run owns. `legacy`/`xunit1` count lines from zero. |
-| `-p vibron_pytest` | Adds each test's file to the report (`xunit2` leaves it out), so a case keeps its file in its id and opens in the editor. |
+| `-p vibron_pytest` | Adds each test's file to the report (`xunit2` leaves it out), so a case keeps its file in its id and opens in the editor, and lets `-k` select one exact test (below). |
 | `-p no:cacheprovider` | No `.pytest_cache` is written into your project. |
 | `PYTHONDONTWRITEBYTECODE=1` | No `__pycache__` in your project or in the installed extension. |
 | `PY_COLORS=0` | Plain text even when `FORCE_COLOR` or `PY_COLORS=1` is set: pytest otherwise writes color codes into the report's failure text, which hides the failing line. |
@@ -38,8 +38,11 @@ PYTHONPATH=<extension>/python PYTEST_ADDOPTS="" PYTHONDONTWRITEBYTECODE=1 PY_COL
 
 Pass paths or node ids as arguments (`tests`, `tests/test_calc.py::test_add`).
 The filter is a pytest `-k` expression (`test_add`, `TestCalc and not slow`),
-as Vibron's contract defines it for every language: it is not the id or the
-full name of a case from the results.
+the tool's own syntax as Vibron's contract defines it. When the filter is
+exactly one test's node id (`tests/test_calc.py::TestAdd::test_same[a&b]`) or
+its name as Vibron shows it (`tests.test_calc.TestAdd.test_same[a&b]`), the
+plugin runs that test alone: pytest's own `-k` would match nothing for such a
+value, or reject it for its `&`, spaces or brackets.
 
 ## How runs end
 
@@ -57,8 +60,8 @@ full name of a case from the results.
 - Autocompletion, errors and go to definition from a Python language server
   (Vibron M5.5.21).
 - Runs on remote workspaces (WSL/SSH): the runner executes on the local host.
-- Rerunning one case from the results: Vibron's contract has no exact case
-  selection yet, so the Test runs panel only repeats the whole run.
+- A "Rerun this test" button: the Test runs panel does not offer it for
+  extension runs yet; an agent can pass the case's name as the filter.
 - A run replaces `PYTHONPATH` with the plugin folder, because the contract
   replaces whole variables. Set import paths with pytest's `pythonpath` option
   in `pytest.ini`/`pyproject.toml` instead.
