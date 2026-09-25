@@ -3,7 +3,7 @@
   "name": "Go",
   "version": "0.1.0",
   "category": "development",
-  "description": "Runs Go tests in Vibron with the Go installed on this machine: build failures, failing tests, crashes and cancellation stay distinct, and nothing is downloaded.",
+  "description": "Runs Go tests in Vibron with the Go installed on this machine: build failures, failing tests, crashes and cancellation stay distinct. It never downloads a Go toolchain.",
   "contributes": {
     "languages": [
       {

@@ -3,8 +3,11 @@
 Language extension for [Vibron](https://github.com/vibron-forge/vibron)
 ([ADR 0005](https://github.com/vibron-forge/vibron/blob/staging/docs/adr/0005-linguagens-como-extensoes-opcionais.md)):
 it declares how to detect a Go project and how to run its tests. It ships no
-code and downloads nothing; Vibron runs the `go` found on your `PATH` and reads
-its `go test -json` stream with the core's `test2json` reader. The manifest
+code and never downloads a Go toolchain; Vibron runs the `go` found on your
+`PATH` and reads its `go test -json` stream with the core's `test2json`
+reader. Like `go test` in your terminal, it may still fetch module
+dependencies missing from your module cache; set `GOPROXY=off` in your
+environment, or vendor them, to forbid that. The manifest
 format is described in Vibron's
 [`docs/extensions/language-contributions.md`](https://github.com/vibron-forge/vibron/blob/staging/docs/extensions/language-contributions.md).
 
@@ -46,5 +49,8 @@ Go's `-run` regular expression.
 
 ## Not included yet
 
-- Autocompletion, errors and go to definition from `gopls` (Vibron M5.5.21).
+- Autocompletion, errors and go to definition from `gopls`: a later version
+  declares it once Vibron's language services (M5.5.21) land, and needs a new
+  approval. Until then Go files show language services as unavailable. `gopls`
+  is installed separately, with `go install golang.org/x/tools/gopls@latest`.
 - Runs on remote workspaces (WSL/SSH): the runner executes on the local host.
