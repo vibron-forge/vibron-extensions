@@ -1,0 +1,42 @@
+{
+  "id": "vibron.go",
+  "name": "Go",
+  "version": "0.1.0",
+  "category": "development",
+  "description": "Runs Go tests in Vibron with the Go installed on this machine: build failures, failing tests, crashes and cancellation stay distinct, and nothing is downloaded.",
+  "contributes": {
+    "languages": [
+      {
+        "id": "go",
+        "name": "Go",
+        "detect": {
+          "extensions": [".go"],
+          "markers": ["go.mod", "go.work"]
+        },
+        "toolchain": {
+          "command": "go",
+          "versionArgs": ["version"],
+          "officialSite": "https://go.dev/dl/"
+        },
+        "testRunner": {
+          "command": "go",
+          "args": ["test", "-json", "-count=1", "-fullpath"],
+          "env": {
+            "GOFLAGS": "",
+            "GOTOOLCHAIN": "local"
+          },
+          "report": {
+            "format": "test2json",
+            "source": "stdout"
+          },
+          "filter": {
+            "args": ["-run", "${filter}"]
+          }
+        },
+        "recommend": {
+          "on": ["file-open", "project-open"]
+        }
+      }
+    ]
+  }
+}
