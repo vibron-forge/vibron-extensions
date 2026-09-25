@@ -65,7 +65,10 @@ committed.
 ## Not included yet
 
 - Autocompletion, errors and go to definition from a Java language server
-  (Vibron M5.5.21).
+  (Vibron M5.5.21). On Windows, Eclipse JDT LS (`jdtls`) starts from
+  `jdtls.bat` or a Python script, and the language server of a contribution is
+  a bare executable started without a shell. A server comes in a later version,
+  verified against the M5.5.21 that is integrated, with a new approval.
 - Runs on remote workspaces (WSL/SSH): the runner executes on the local host.
 - Gradle reports a class whose setup failed as a failed `initializationError`
   case (its own convention); only the Maven side lifts it to a suite failure.
