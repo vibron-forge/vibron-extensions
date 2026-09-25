@@ -46,7 +46,7 @@
               "args": ["-Pvibron.reportsDirectory=${reportDir}"]
             },
             "filter": {
-              "args": ["--tests", "${filter}"]
+              "args": ["--tests=${filter}"]
             }
           }
         ],

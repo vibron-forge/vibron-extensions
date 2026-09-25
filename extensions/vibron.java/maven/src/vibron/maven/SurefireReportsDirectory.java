@@ -1,6 +1,6 @@
 package vibron.maven;
 
-import java.io.File;
+import java.util.Properties;
 import javax.inject.Named;
 import javax.inject.Singleton;
 import org.apache.maven.AbstractMavenLifecycleParticipant;
@@ -9,23 +9,20 @@ import org.apache.maven.model.Plugin;
 import org.apache.maven.model.PluginExecution;
 import org.apache.maven.project.MavenProject;
 import org.codehaus.plexus.util.xml.Xpp3Dom;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Maven core extension that the vibron.java extension loads with {@code -Dmaven.ext.class.path}
  * when Vibron runs {@code mvn test}. It acts only when {@code -Dvibron.reportsDirectory} names the
  * run's report directory. Surefire has no command-line property for its reportsDirectory, so this
- * points the plugin and its executions there; when the session ends it reports the test classes
- * whose setup failed and the builds that failed before Surefire ran, in the JUnit XML shape Vibron
- * reads as a suite failure (see {@link SuiteFailures}).
+ * points the plugin and its executions there; once Maven has its result, {@link ExecutionResultSpy}
+ * reports the test classes whose setup failed and the builds that failed before Surefire ran, in
+ * the JUnit XML shape Vibron reads as a suite failure (see {@link SuiteFailures}).
  */
 @Named("vibron-surefire-reports")
 @Singleton
 public class SurefireReportsDirectory extends AbstractMavenLifecycleParticipant {
     static final String PROPERTY = "vibron.reportsDirectory";
     private static final String SUREFIRE = "org.apache.maven.plugins:maven-surefire-plugin";
-    private static final Logger LOG = LoggerFactory.getLogger(SurefireReportsDirectory.class);
 
     @Override
     public void afterSessionStart(MavenSession session) {
@@ -34,7 +31,7 @@ public class SurefireReportsDirectory extends AbstractMavenLifecycleParticipant 
 
     @Override
     public void afterProjectsRead(MavenSession session) {
-        String dir = reportsDirectory(session);
+        String dir = reportsDirectory(session.getUserProperties());
         if (dir == null) {
             return;
         }
@@ -50,22 +47,8 @@ public class SurefireReportsDirectory extends AbstractMavenLifecycleParticipant 
         }
     }
 
-    @Override
-    public void afterSessionEnd(MavenSession session) {
-        String dir = reportsDirectory(session);
-        if (dir == null) {
-            return;
-        }
-        try {
-            SuiteFailures.report(new File(dir), session.getResult().getExceptions());
-        } catch (Exception e) {
-            // Never change the build's outcome: Vibron still reads what Surefire wrote.
-            LOG.warn("vibron: could not report suite failures in {}: {}", dir, e.toString());
-        }
-    }
-
-    private static String reportsDirectory(MavenSession session) {
-        String dir = session.getUserProperties().getProperty(PROPERTY);
+    static String reportsDirectory(Properties userProperties) {
+        String dir = userProperties.getProperty(PROPERTY);
         return dir == null || dir.isEmpty() ? null : dir;
     }
 

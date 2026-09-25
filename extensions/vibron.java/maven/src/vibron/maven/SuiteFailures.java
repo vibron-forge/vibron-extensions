@@ -7,7 +7,11 @@ import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.transform.OutputKeys;
@@ -15,7 +19,9 @@ import javax.xml.transform.Transformer;
 import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
-import org.apache.maven.lifecycle.LifecycleExecutionException;
+import org.apache.maven.execution.BuildFailure;
+import org.apache.maven.execution.BuildSummary;
+import org.apache.maven.execution.MavenExecutionResult;
 import org.apache.maven.project.MavenProject;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
@@ -36,7 +42,7 @@ final class SuiteFailures {
     private SuiteFailures() {
     }
 
-    static void report(File dir, List<Throwable> exceptions) throws Exception {
+    static void report(File dir, MavenExecutionResult result) throws Exception {
         File[] reports = dir.listFiles();
         if (reports != null) {
             Arrays.sort(reports);
@@ -46,16 +52,31 @@ final class SuiteFailures {
                 }
             }
         }
+        // The module of each failure, as the reactor summary records it: a plugin that does not
+        // resolve fails its module without a LifecycleExecutionException naming that module.
+        Map<Throwable, MavenProject> modules = new IdentityHashMap<Throwable, MavenProject>();
+        for (MavenProject project : result.getTopologicallySortedProjects()) {
+            BuildSummary summary = result.getBuildSummary(project);
+            if (summary instanceof BuildFailure) {
+                modules.put(((BuildFailure) summary).getCause(), project);
+            }
+        }
+        // Vibron refuses a report that names the same suite twice.
+        Set<String> suites = new HashSet<String>();
         int written = 0;
-        for (Throwable exception : exceptions) {
-            MavenProject project = exception instanceof LifecycleExecutionException
-                    ? ((LifecycleExecutionException) exception).getProject()
-                    : null;
+        for (Throwable exception : result.getExceptions()) {
+            MavenProject project = modules.get(exception);
             if (project != null && SurefireTestGoals.started(project)) {
                 continue;
             }
+            // No module: Maven stopped before its reactor existed.
+            String name = project == null ? "maven" : project.getGroupId() + ":" + project.getArtifactId();
+            String suite = name;
+            for (int n = 2; !suites.add(suite); n++) {
+                suite = name + "-" + n;
+            }
             written++;
-            writeBuildFailure(new File(dir, "TEST-vibron-setup-" + written + ".xml"), project, exception);
+            writeBuildFailure(new File(dir, "TEST-vibron-setup-" + written + ".xml"), suite, exception);
         }
     }
 
@@ -92,10 +113,10 @@ final class SuiteFailures {
         write(document, report);
     }
 
-    private static void writeBuildFailure(File target, MavenProject project, Throwable exception) throws Exception {
+    private static void writeBuildFailure(File target, String name, Throwable exception) throws Exception {
         Document document = DocumentBuilderFactory.newInstance().newDocumentBuilder().newDocument();
         Element suite = document.createElement("testsuite");
-        suite.setAttribute("name", project == null ? "maven" : project.getGroupId() + ":" + project.getArtifactId());
+        suite.setAttribute("name", name);
         suite.setAttribute("tests", "1");
         suite.setAttribute("errors", "1");
         suite.setAttribute("failures", "0");

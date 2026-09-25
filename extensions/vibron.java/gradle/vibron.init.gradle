@@ -1,9 +1,11 @@
 def directory = gradle.startParameter.projectProperties['vibron.reportsDirectory']
 if (directory) {
-    allprojects {
-        tasks.withType(Test).configureEach { Test task ->
+    // After every build script and afterEvaluate: the project's own test { reports ... } cannot redirect or turn off the report Vibron reads.
+    gradle.taskGraph.whenReady { graph ->
+        graph.allTasks.findAll { it instanceof Test }.each { Test task ->
             // One folder per Test task (test, integrationTest, app.test...): Gradle deletes the TEST*.xml of its output folder before writing.
             def owner = task.project.path == ':' ? '' : task.project.path.substring(1).replace(':', '.') + '.'
+            task.reports.junitXml.required.set(true)
             task.reports.junitXml.outputLocation.set(new File(directory, owner + task.name))
             task.reports.junitXml.mergeReruns.set(true)
             // Every run is a new verdict: never up to date, never restored from the build cache.

@@ -38,18 +38,20 @@ Vibron refuses the run and lists the markers it looked for.
 
 ```
 mvn test --batch-mode -Dmaven.ext.class.path=<extension>/dist/maven/vibron-surefire-reports.jar [your args] [-Dtest=<filter>] -Dvibron.reportsDirectory=<run directory>
-gradle test --init-script <extension>/dist/gradle/vibron.init.gradle [your args] [--tests <filter>] -Pvibron.reportsDirectory=<run directory>
+gradle test --init-script <extension>/dist/gradle/vibron.init.gradle [your args] [--tests=<filter>] -Pvibron.reportsDirectory=<run directory>
 ```
 
 | Part | Why |
 | --- | --- |
-| `vibron-surefire-reports.jar` | A Maven core extension. Surefire has no command-line property for its `reportsDirectory`, so it points the plugin and each of its executions at `vibron.reportsDirectory`. When the session ends it writes what kept tests from running in the shape JUnit XML gives a suite that failed outside any test (a `<failure>`/`<error>` directly under `<testsuite>`). Without `vibron.reportsDirectory` it does nothing, and it never changes the build's outcome. |
-| `vibron.init.gradle` | Points the JUnit XML of each `Test` task at its own folder under `vibron.reportsDirectory` (`test`, `integrationTest`, `app.test`…): Gradle deletes the `TEST*.xml` of its output folder before writing, so in a shared folder one task erased the others' reports. Writes a rerun (the `test-retry` plugin) into the same case (`mergeReruns`), which Vibron counts as an attempt. Makes the task never up to date and never restored from the build cache, so every run is a new verdict (with `--build-cache` or `org.gradle.caching=true`, a run replayed `:test FROM-CACHE` without running the tests). |
+| `vibron-surefire-reports.jar` | A Maven core extension. Surefire has no command-line property for its `reportsDirectory`, so it points the plugin and each of its executions at `vibron.reportsDirectory`. Once Maven has its result it writes what kept tests from running in the shape JUnit XML gives a suite that failed outside any test (a `<failure>`/`<error>` directly under `<testsuite>`); it reads that result as an event spy, which Maven also calls when it stops before its reactor exists. Without `vibron.reportsDirectory` it does nothing, and it never changes the build's outcome. |
+| `vibron.init.gradle` | Points the JUnit XML of each `Test` task at its own folder under `vibron.reportsDirectory` (`test`, `integrationTest`, `app.test`…): Gradle deletes the `TEST*.xml` of its output folder before writing, so in a shared folder one task erased the others' reports. Writes a rerun (the `test-retry` plugin) into the same case (`mergeReruns`), which Vibron counts as an attempt. Makes the task never up to date and never restored from the build cache, so every run is a new verdict (with `--build-cache` or `org.gradle.caching=true`, a run replayed `:test FROM-CACHE` without running the tests). It configures the tasks once the task graph is ready, after every build script and `afterEvaluate`, and turns the JUnit XML report on: a project whose own `test { reports.junitXml … }` names another folder or sets `required = false` still writes the report Vibron reads. |
 | `<run directory>` | Created empty by Vibron for each run, so a run reads only its own reports. |
 | `--batch-mode` | No prompts and no colour codes in the log. |
 
 The filter is Surefire's `-Dtest` (`Class`, `Class#method`) or Gradle's
-`--tests` (`demo.CalculatorTest`).
+`--tests` (`demo.CalculatorTest`), in the same argument as its option
+(`-Dtest=<filter>`, `--tests=<filter>`): a filter that starts with `-` is read
+as a pattern, never as an option of Maven or Gradle.
 
 ## How runs end
 
@@ -58,8 +60,11 @@ The filter is Surefire's `-Dtest` (`Class`, `Class#method`) or Gradle's
 | A test fails | `failed`, at the test's own line |
 | A test class's setup fails (a throwing `@BeforeAll`/`@BeforeClass`) under Maven | `setup-failed`: Surefire reports it as the class's only case, `initializationError` (or, before Surefire 3.6, a case with an empty name for JUnit 4), which the Maven core extension turns into a suite failure |
 | A test class's setup fails under Gradle | `setup-failed`: Gradle writes the class as a case named `initializationError` (JUnit Platform) or `classMethod` (JUnit 4), which Vibron's JUnit XML reader reads as the class |
-| Maven fails before Surefire runs (test sources that do not compile, a dependency that does not resolve) | `setup-failed`, with Maven's message, written as `TEST-vibron-setup-<n>.xml` |
-| The Gradle test worker dies (`System.exit`, a JVM crash) | `crashed` with unknown counts: Gradle writes no XML |
+| Maven fails before Surefire runs (test sources that do not compile, a plugin or dependency that does not resolve), or before its reactor exists (a POM that does not parse, a parent that does not resolve, a `-pl` that names no module) | `setup-failed`, with Maven's message, written as `TEST-vibron-setup-<n>.xml`. The suite is the failed module's `groupId:artifactId`, or `maven` when Maven stopped before its reactor existed; a name that would repeat gets `-2`, `-3`… |
+| Maven fails before it loads its extensions (an option it does not know, a `.mvn/extensions.xml` that does not parse) | `crashed`, with Maven's message in the log: the core extension never ran, so nothing wrote a report |
+| Gradle fails before a `Test` task runs (test sources that do not compile, a dependency that does not resolve) | `crashed`, with Gradle's message in the log: Gradle writes no XML, and the init script does not turn that failure into a suite failure as the Maven core extension does |
+| The Gradle test worker dies (`System.exit`, a JVM crash) | `crashed` with unknown counts: Gradle writes no XML for that task, not even for the classes that finished before, so an assertion that failed in the same task does not hide the crash |
+| The worker of one of several Gradle `Test` tasks dies (`test` and `integrationTest`, or subprojects with `--continue` or parallel execution) | `failed`: Vibron reads the XML of the other tasks, and the dead task leaves none. The crash hides behind their failed tests, or, when they all passed, the run is `failed` with no failed test; Gradle's message is in the log |
 | No report at all (no tests, or the filter matched nothing) | `crashed`, never `passed` |
 
 ## Build
