@@ -3,6 +3,9 @@ if (directory) {
     allprojects {
         tasks.withType(Test).configureEach {
             reports.junitXml.outputLocation.set(new File(directory))
+            // Every run is a new verdict: never up to date, never restored from the build cache.
+            outputs.upToDateWhen(org.gradle.api.specs.Specs.satisfyNone())
+            outputs.doNotCacheIf('Vibron reads a new verdict from every run', org.gradle.api.specs.Specs.satisfyAll())
         }
     }
 }

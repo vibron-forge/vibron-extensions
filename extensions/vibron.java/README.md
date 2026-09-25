@@ -35,7 +35,7 @@ gradle test --init-script <extension>/dist/gradle/vibron.init.gradle [your args]
 | Part | Why |
 | --- | --- |
 | `vibron-surefire-reports.jar` | A Maven core extension. Surefire has no command-line property for its `reportsDirectory`, so it points the plugin and each of its executions at `vibron.reportsDirectory`. When the session ends it writes what kept tests from running in the shape JUnit XML gives a suite that failed outside any test (a `<failure>`/`<error>` directly under `<testsuite>`). Without `vibron.reportsDirectory` it does nothing, and it never changes the build's outcome. |
-| `vibron.init.gradle` | Points the JUnit XML of every `Test` task at `vibron.reportsDirectory`. |
+| `vibron.init.gradle` | Points the JUnit XML of every `Test` task at `vibron.reportsDirectory`, and makes the task never up to date and never restored from the build cache, so every run is a new verdict (with `--build-cache` or `org.gradle.caching=true`, the recipe alone replayed `:test FROM-CACHE`). |
 | `<run directory>` | Created empty by Vibron for each run, so a run reads only its own reports. |
 | `--batch-mode` | No prompts and no colour codes in the log. |
 
@@ -47,7 +47,7 @@ The filter is Surefire's `-Dtest` (`Class`, `Class#method`) or Gradle's
 | Situation | Vibron shows |
 | --- | --- |
 | A test fails | `failed`, at the test's own line |
-| A test class's setup fails (a throwing `@BeforeAll`/`@BeforeClass`) under Maven | `setup-failed`: Surefire reports it as the class's only case, `initializationError`, which the Maven core extension turns into a suite failure |
+| A test class's setup fails (a throwing `@BeforeAll`/`@BeforeClass`) under Maven | `setup-failed`: Surefire reports it as the class's only case, `initializationError` (or, before Surefire 3.6, a case with an empty name for JUnit 4), which the Maven core extension turns into a suite failure |
 | Maven fails before Surefire runs (test sources that do not compile, a dependency that does not resolve) | `setup-failed`, with Maven's message, written as `TEST-vibron-setup-<n>.xml` |
 | The Gradle test worker dies (`System.exit`, a JVM crash) | `crashed` with unknown counts: Gradle writes no XML |
 | No report at all (no tests, or the filter matched nothing) | `crashed`, never `passed` |
@@ -71,13 +71,15 @@ committed.
   verified against the M5.5.21 that is integrated, with a new approval.
 - Runs on remote workspaces (WSL/SSH): the runner executes on the local host.
 - Gradle reports a class whose setup failed as a failed `initializationError`
-  case (its own convention); only the Maven side lifts it to a suite failure.
+  (JUnit Platform) or `classMethod` (JUnit 4) case; only the Maven side lifts
+  it to a suite failure.
 - A multi-module build writes every module's reports into one directory, so two
   modules with a test class of the same name overwrite each other's report.
 - A Surefire fork that dies after some classes finished leaves their reports,
   so that run ends `failed` rather than `crashed`.
-- A Gradle build cache may restore the test task's reports instead of running
-  the tests again.
+- Before Surefire 3.6, a JUnit 4 class-level `@Ignore` is a case with an empty
+  name, which the core's JUnit XML reader refuses, so the whole run ends
+  `crashed` until that reader accepts it.
 - The contract carries one official site per language, so a missing `mvn` or
   `gradle` also points to the Java download rather than to maven.apache.org or
   gradle.org.

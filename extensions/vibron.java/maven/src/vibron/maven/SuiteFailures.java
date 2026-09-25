@@ -28,7 +28,8 @@ import org.w3c.dom.Node;
  */
 final class SuiteFailures {
     /** Surefire's case for a test class that failed before any of its tests ran, such as a
-     *  throwing {@code @BeforeAll}/{@code @BeforeClass} (the JUnit 4 name, kept for the JUnit Platform). */
+     *  throwing {@code @BeforeAll}/{@code @BeforeClass} (the JUnit 4 name, kept for the JUnit
+     *  Platform). Surefire 3.5 and older write the JUnit 4 one with an empty name instead. */
     private static final String CLASS_SETUP = "initializationError";
     private static final int MAX_CAUSES = 16;
 
@@ -66,7 +67,8 @@ final class SuiteFailures {
             return;
         }
         List<Element> cases = children(suite, "testcase");
-        if (cases.size() != 1 || !CLASS_SETUP.equals(cases.get(0).getAttribute("name"))) {
+        String name = cases.size() == 1 ? cases.get(0).getAttribute("name") : null;
+        if (name == null || !(CLASS_SETUP.equals(name) || name.isEmpty())) {
             return;
         }
         Element testCase = cases.get(0);
