@@ -11,6 +11,11 @@ under `extensions/`, published to the catalog Cate ships by default.
 - **Design** — `cate.excalidraw` (whiteboard), `cate.mermaid` (diagram editor)
 - **Development** — `cate.frontendkit`, `cate.kitchensink` (reference apps,
   `"dev": true`, sideload only)
+- **Languages** (Vibron) — `vibron.java` (Maven and Gradle tests with the Java
+  installed on the machine; building it needs a JDK 17+ and Maven). A language
+  extension ships only `contributes.languages`, no panels;
+  see Vibron's [ADR 0005](https://github.com/vibron-forge/vibron/blob/staging/docs/adr/0005-linguagens-como-extensoes-opcionais.md)
+  and [`docs/extensions/language-contributions.md`](https://github.com/vibron-forge/vibron/blob/staging/docs/extensions/language-contributions.md).
 
 ## Layout
 

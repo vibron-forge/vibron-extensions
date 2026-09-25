@@ -1,0 +1,8 @@
+def directory = gradle.startParameter.projectProperties['vibron.reportsDirectory']
+if (directory) {
+    allprojects {
+        tasks.withType(Test).configureEach {
+            reports.junitXml.outputLocation.set(new File(directory))
+        }
+    }
+}
