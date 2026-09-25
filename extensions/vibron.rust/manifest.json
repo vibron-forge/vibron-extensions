@@ -3,6 +3,7 @@
   "name": "Rust",
   "version": "0.1.0",
   "category": "development",
+  "description": "Runs Rust tests in Vibron with the Rust installed on this machine: a crate that does not compile, failing tests and ignored tests stay distinct, and nothing is downloaded.",
   "contributes": {
     "languages": [
       {
