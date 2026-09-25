@@ -45,7 +45,7 @@ for dir in "$EXT_DIR"/*/; do
     ( cd "$dir" && npm run build )
   fi
 
-  version="$(node -e "process.stdout.write(String(require('$manifest').version || '0.0.0'))")"
+  version="$(node -e "process.stdout.write(String(require(process.argv[1]).version || '0.0.0'))" "$manifest")"
   out="$ARTIFACT_DIR/$id-$version.tgz"
   # COPYFILE_DISABLE avoids macOS ._* AppleDouble entries in the tarball.
   if [[ -d "$dir/dist" ]]; then
