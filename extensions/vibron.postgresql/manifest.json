@@ -1,0 +1,48 @@
+{
+  "id": "vibron.postgresql",
+  "name": "PostgreSQL",
+  "version": "1.0.0",
+  "category": "data",
+  "description": "A private PostgreSQL for each project, run with the PostgreSQL installed on your computer: data outside the project, listening only on 127.0.0.1, password generated and kept encrypted by Vibron. Processes that ask for it get DATABASE_URL.",
+  "contributes": {
+    "services": [
+      {
+        "id": "postgresql",
+        "name": "PostgreSQL",
+        "kind": "database",
+        "toolchain": {
+          "command": "postgres",
+          "versionArgs": ["--version"],
+          "officialSite": "https://www.postgresql.org/download/"
+        },
+        "secret": { "file": "${secret}\n" },
+        "init": {
+          "command": "initdb",
+          "args": ["-D", "${dataDir}", "-U", "vibron", "-A", "scram-sha-256", "--pwfile=${secretFile}", "-E", "UTF8"]
+        },
+        "start": {
+          "command": "postgres",
+          "args": ["-D", "${dataDir}", "-h", "${host}", "-p", "${port}", "-c", "unix_socket_directories="]
+        },
+        "ready": {
+          "command": "pg_isready",
+          "args": ["-h", "${host}", "-p", "${port}", "-q"]
+        },
+        "stop": {
+          "command": "pg_ctl",
+          "args": ["stop", "-D", "${dataDir}", "-m", "fast", "-w"]
+        },
+        "connection": {
+          "env": {
+            "DATABASE_URL": "postgresql://vibron:${secret}@${host}:${port}/postgres",
+            "PGHOST": "${host}",
+            "PGPORT": "${port}",
+            "PGUSER": "vibron",
+            "PGPASSWORD": "${secret}",
+            "PGDATABASE": "postgres"
+          }
+        }
+      }
+    ]
+  }
+}
