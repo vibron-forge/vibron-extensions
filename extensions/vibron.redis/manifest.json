@@ -1,0 +1,44 @@
+{
+  "id": "vibron.redis",
+  "name": "Redis",
+  "version": "1.0.0",
+  "category": "data",
+  "description": "A private Redis for each project — the queue behind BullMQ, Sidekiq, Celery and RQ — run with the Redis installed on your computer: data outside the project, listening only on 127.0.0.1, password generated and kept encrypted by Vibron. Processes that ask for it get REDIS_URL.",
+  "contributes": {
+    "services": [
+      {
+        "id": "redis",
+        "name": "Redis",
+        "kind": "queue",
+        "toolchain": {
+          "command": "redis-server",
+          "versionArgs": ["--version"],
+          "officialSite": "https://redis.io/downloads/"
+        },
+        "secret": { "file": "requirepass ${secret}\n" },
+        "start": {
+          "command": "redis-server",
+          "args": ["${secretFile}", "--bind", "${host}", "--port", "${port}", "--protected-mode", "yes", "--dir", "${dataDir}", "--appendonly", "yes"]
+        },
+        "ready": {
+          "command": "redis-cli",
+          "args": ["-h", "${host}", "-p", "${port}", "ping"],
+          "env": { "REDISCLI_AUTH": "${secret}" }
+        },
+        "stop": {
+          "command": "redis-cli",
+          "args": ["-h", "${host}", "-p", "${port}", "shutdown"],
+          "env": { "REDISCLI_AUTH": "${secret}" }
+        },
+        "connection": {
+          "env": {
+            "REDIS_URL": "redis://:${secret}@${host}:${port}/0",
+            "REDIS_HOST": "${host}",
+            "REDIS_PORT": "${port}",
+            "REDISCLI_AUTH": "${secret}"
+          }
+        }
+      }
+    ]
+  }
+}
