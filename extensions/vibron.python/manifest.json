@@ -1,0 +1,45 @@
+{
+  "id": "vibron.python",
+  "name": "Python",
+  "version": "0.3.1",
+  "category": "development",
+  "description": "Runs Python tests in Vibron with pytest on the Python installed on this machine: passed, failed, skipped and crashed runs stay distinct, a skip never counts as a pass, and nothing is downloaded.",
+  "contributes": {
+    "languages": [
+      {
+        "id": "python",
+        "name": "Python",
+        "detect": {
+          "extensions": [".py", ".pyi"],
+          "markers": ["pyproject.toml", "setup.py", "setup.cfg", "requirements.txt", "Pipfile", "pytest.ini", "tox.ini"]
+        },
+        "toolchain": {
+          "command": "python",
+          "versionArgs": ["--version"],
+          "officialSite": "https://www.python.org/downloads/"
+        },
+        "testRunner": {
+          "command": "pytest",
+          "args": ["-p", "vibron_pytest", "-p", "no:cacheprovider", "-o", "junit_family=xunit2"],
+          "env": {
+            "PYTHONPATH": "${extensionDir}/python",
+            "PYTEST_ADDOPTS": "",
+            "PYTHONDONTWRITEBYTECODE": "1",
+            "PY_COLORS": "0"
+          },
+          "report": {
+            "format": "junit-xml",
+            "source": "file",
+            "args": ["--junitxml=${reportFile}"]
+          },
+          "filter": {
+            "args": ["-k", "${filter}"]
+          }
+        },
+        "recommend": {
+          "on": ["file-open", "project-open"]
+        }
+      }
+    ]
+  }
+}
