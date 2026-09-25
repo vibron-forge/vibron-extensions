@@ -1,0 +1,44 @@
+{
+  "id": "vibron.rust",
+  "name": "Rust",
+  "version": "0.1.0",
+  "category": "development",
+  "description": "Runs Rust tests in Vibron with the Rust installed on this machine: a crate that does not compile, failing tests and ignored tests stay distinct. It never downloads a Rust toolchain.",
+  "contributes": {
+    "languages": [
+      {
+        "id": "rust",
+        "name": "Rust",
+        "detect": {
+          "extensions": [".rs"],
+          "markers": ["Cargo.toml"]
+        },
+        "toolchain": {
+          "command": "cargo",
+          "versionArgs": ["--version"],
+          "officialSite": "https://www.rust-lang.org/tools/install"
+        },
+        "testRunner": {
+          "command": "cargo",
+          "args": ["test", "--no-fail-fast"],
+          "env": {
+            "RUSTC_BOOTSTRAP": "0",
+            "RUSTUP_AUTO_INSTALL": "0",
+            "RUST_TEST_NOCAPTURE": "0"
+          },
+          "report": {
+            "format": "libtest-json",
+            "source": "stdout",
+            "args": ["--", "-Z", "unstable-options", "--format", "json", "--report-time"]
+          },
+          "filter": {
+            "args": ["${filter}"]
+          }
+        },
+        "recommend": {
+          "on": ["file-open", "project-open"]
+        }
+      }
+    ]
+  }
+}
