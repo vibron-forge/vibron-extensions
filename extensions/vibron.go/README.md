@@ -43,7 +43,7 @@ Go's `-run` regular expression.
 | A test fails | `failed`, with the failing line |
 | A test panics | `failed`, pointing at the test's own frame |
 | The package does not compile (or `go vet` fails) | `setup-failed`, with the compiler's line |
-| The test binary dies mid-run (`-timeout`, `os.Exit`) | `crashed`, with what the test printed |
+| The test binary dies mid-run (`-timeout`, `os.Exit`) | `crashed`, with what the test printed; `failed` if a test had already failed, with the crash kept as a case of its own |
 | You cancel | `cancelled`; the test binary is stopped too |
 | No test ran (no test files, or the filter matched nothing) | `skipped`, never `passed` |
 
