@@ -46,7 +46,8 @@ describe('panel', () => {
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
     await flush(); await flush(); await flush()
     expect(f.host.agent.open).toHaveBeenCalledWith({ profileId: 'planner' })
-    expect([...root.querySelectorAll('.entry')].map(e => [e.getAttribute('data-role'), e.textContent])).toEqual([['you', 'Plan it'], ['dot', 'ok: Plan it']])
+    expect([...root.querySelectorAll('.entry')].map(e => [e.getAttribute('data-role'), e.querySelector('.text')?.textContent])).toEqual([['you', 'Plan it'], ['dot', 'ok: Plan it']])
+    expect(root.querySelectorAll('.entry[data-role=dot] .save-page')).toHaveLength(1)
     expect(root.querySelector('.dots-chat .status')?.textContent).toBe('p/planner-model')
     expect(f.store.get(STATE_KEY)).toMatchObject({ version: 1, selectedId: 'planner' })
 

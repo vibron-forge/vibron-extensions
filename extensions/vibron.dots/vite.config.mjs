@@ -1,13 +1,12 @@
 import { defineConfig } from 'vite'
 
-// The panel is served by Vibron's extension proxy at /ext/<token>/ while the
-// build ships under dist/. A relative base keeps runtime URLs resolving against
-// each file's real location; the entry refs in dist/index.html are rewritten
-// to dist/ by scripts/postbuild.mjs.
+// The panel is served by the extension's own server (dist/server.js) at the
+// route root, from dist/public. A relative base keeps the entry refs
+// (`./app.js`) resolving under Vibron's proxy prefix.
 export default defineConfig({
   base: './',
   build: {
-    outDir: 'dist',
+    outDir: 'dist/public',
     emptyOutDir: true,
     cssCodeSplit: false,
     rollupOptions: {

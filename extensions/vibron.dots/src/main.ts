@@ -9,12 +9,21 @@ import './styles.css'
 import type { VibronHost } from './vibron-host'
 import { applyTheme } from './theme'
 import { createDotChat, type ChatHost } from './chat'
+import { api, type ScheduleView } from './api'
+import { validateDraft as validatePageDraft, type PageDraft } from './pages'
+import { EVERY_MIN, validateTaskDraft, type TaskDraft } from './schedule'
 import {
   STATE_KEY, addDot, removeDot, sanitizeState, selectDot, updateDot,
   type Dot, type DotDraft, type DotsState, type TranscriptEntry,
 } from './state'
 
-export type PanelHost = ChatHost & { theme?: Pick<VibronHost['theme'], 'get'>; ui?: Pick<VibronHost['ui'], 'notify'>; storage: Pick<VibronHost['storage'], 'get' | 'set' | 'onChange'> }
+export type PanelHost = ChatHost & {
+  theme?: Pick<VibronHost['theme'], 'get'>
+  ui?: Pick<VibronHost['ui'], 'notify'>
+  editor?: Pick<VibronHost['editor'], 'openFile'>
+  workspace?: Pick<VibronHost['workspace'], 'get'>
+  storage: Pick<VibronHost['storage'], 'get' | 'set' | 'onChange'>
+}
 
 const el = <K extends keyof HTMLElementTagNameMap>(tag: K, props: Partial<HTMLElementTagNameMap[K]> & { class?: string; text?: string } = {}, ...children: (Node | string)[]) => {
   const node = document.createElement(tag)
@@ -46,6 +55,8 @@ export async function mount(root: HTMLElement, host: PanelHost, now: () => numbe
   const status = el('span', { class: 'status' })
   const editButton = el('button', { class: 'small', text: 'Edit' })
   const resetButton = el('button', { class: 'small', text: 'Reset' })
+  const workButton = el('button', { class: 'small', text: 'Pages & schedule' })
+  const drawer = el('aside', { class: 'drawer', hidden: true })
   const transcriptView = el('div', { class: 'transcript' })
   const input = el('textarea', { placeholder: 'Ask the selected Dot… (Enter sends, Shift+Enter is a new line)', rows: 2 })
   const sendButton = el('button', { class: 'primary', text: 'Send' })
@@ -53,9 +64,10 @@ export async function mount(root: HTMLElement, host: PanelHost, now: () => numbe
   const shell = el('div', { class: 'dots' },
     el('aside', { class: 'dots-list' }, el('header', {}, el('span', { text: 'Dots' }), addButton), list),
     el('section', { class: 'dots-chat' },
-      el('header', {}, title, status, editButton, resetButton),
+      el('header', {}, title, status, editButton, resetButton, workButton),
       transcriptView,
-      el('div', { class: 'composer' }, input, sendButton, cancelButton)))
+      el('div', { class: 'composer' }, input, sendButton, cancelButton)),
+    drawer)
   root.replaceChildren(shell)
 
   // --- rendering ------------------------------------------------------------
@@ -89,10 +101,74 @@ export async function mount(root: HTMLElement, host: PanelHost, now: () => numbe
       transcriptView.replaceChildren(el('div', { class: 'empty', text: dot.instructions ? `${dot.name} works under its instructions. Send the first message to open its session.` : `${dot.name} has no instructions yet. Edit it, or just send a message.` }))
       return
     }
-    transcriptView.replaceChildren(...transcript.map(entry => { const node = el('div', { class: 'entry', text: entry.text }); node.dataset.role = entry.role; return node }))
+    transcriptView.replaceChildren(...transcript.map(entry => {
+      const node = el('div', { class: 'entry' }, el('span', { class: 'text', text: entry.text }))
+      node.dataset.role = entry.role
+      if (entry.role === 'dot') {
+        // A Dot's answer can become a page in the project, after the human reviews it.
+        const save = el('button', { class: 'small save-page', text: 'Save as page' })
+        save.addEventListener('click', () => { void saveAsPage(entry.text) })
+        node.append(el('div', { class: 'entry-actions' }, save))
+      }
+      return node
+    }))
     transcriptView.scrollTop = transcriptView.scrollHeight
     renderStatus()
   }
+
+  // --- pages & schedule (the extension's own server) --------------------------
+  async function saveAsPage(content: string) {
+    const dot = selected()
+    const draft = await openPageReview(root, { title: dot ? `${dot.name}: ${content.split('\n')[0]?.slice(0, 60) ?? ''}` : '', content, ...(dot ? { dotId: dot.id } : {}), source: 'conversation' })
+    if (!draft) return
+    try {
+      const { page } = await api.savePage(draft)
+      await host.ui?.notify(`Saved ${page.relPath}`)
+      const rootPath = (await host.workspace?.get())?.rootPath
+      if (rootPath && host.editor) await host.editor.openFile(`${rootPath.replace(/[\\/]+$/, '')}/${page.relPath}`)
+      if (!drawer.hidden) void renderDrawer()
+    } catch (error) { await host.ui?.notify(error instanceof Error ? error.message : String(error), 'error') }
+  }
+
+  let drawerTimer: ReturnType<typeof setInterval> | undefined
+  async function renderDrawer() {
+    let schedule: ScheduleView | null = null, pages: Awaited<ReturnType<typeof api.pages>>['pages'] = [], failure = ''
+    try { [schedule, pages] = await Promise.all([api.schedule(), api.pages().then(r => r.pages)]) } catch (error) { failure = error instanceof Error ? error.message : String(error) }
+    const close = el('button', { class: 'small', text: 'Close' })
+    close.addEventListener('click', () => { drawer.hidden = true; clearInterval(drawerTimer) })
+    const head = el('header', {}, el('span', { class: 'title', text: 'Pages & schedule' }), close)
+    if (!schedule) { drawer.replaceChildren(head, el('div', { class: 'empty', text: `The Dots server is not reachable: ${failure}` })); return }
+    const dotName = (id: string) => state.dots.find(dot => dot.id === id)?.name ?? id
+    const when = (at: number) => at ? new Date(at).toLocaleString() : 'never'
+    const tasks = el('ul', { class: 'tasks' }, ...schedule.tasks.map(task => {
+      const act = (action: 'pause' | 'resume' | 'run' | 'delete', label: string) => { const b = el('button', { class: 'small', text: label }); b.addEventListener('click', () => { void api.taskAction(task.id, action).then(renderDrawer, error => host.ui?.notify(String(error), 'error')) }); return b }
+      const last = [...schedule!.runs].reverse().find(run => run.taskId === task.id)
+      const item = el('li', {}, el('div', { class: 'name', text: `${task.title} · ${dotName(task.dotId)} · every ${task.everyMinutes} min${task.paused ? ' · paused' : ''}` }),
+        el('div', { class: 'role', text: last ? `last run ${when(last.startedAt)}: ${last.status}${last.pageRelPath ? ` → ${last.pageRelPath}` : last.detail ? ` (${last.detail})` : ''}` : 'not run yet' }),
+        el('div', { class: 'entry-actions' }, task.paused ? act('resume', 'Resume') : act('pause', 'Pause'), act('run', 'Run now'), act('delete', 'Delete')))
+      item.dataset.taskId = task.id
+      item.dataset.lastStatus = last?.status ?? ''
+      return item
+    }))
+    const form = taskForm(state.dots, async draft => {
+      try { await api.createTask(draft); await renderDrawer() } catch (error) { await host.ui?.notify(error instanceof Error ? error.message : String(error), 'error') }
+    })
+    const pageList = el('ul', { class: 'pages' }, ...pages.map(page => {
+      const open = el('button', { class: 'small', text: 'Open' })
+      open.addEventListener('click', () => { void host.workspace?.get().then(ws => ws.rootPath && host.editor?.openFile(`${ws.rootPath.replace(/[\\/]+$/, '')}/${page.relPath}`)) })
+      return el('li', {}, el('div', { class: 'name', text: page.title }), el('div', { class: 'role', text: `${page.relPath}${page.dotId ? ` · ${dotName(page.dotId)}` : ''}` }), el('div', { class: 'entry-actions' }, open))
+    }))
+    drawer.replaceChildren(head,
+      el('h3', { text: `Scheduled work${schedule.running ? ' · running' : ''}` }),
+      el('p', { class: 'hint', text: 'Runs while this panel is open: the Dot answers the prompt and the answer is saved as a page.' }),
+      schedule.tasks.length ? tasks : el('div', { class: 'empty', text: 'No scheduled task yet.' }), form,
+      el('h3', { text: 'Pages' }), pages.length ? pageList : el('div', { class: 'empty', text: 'No page yet. Save a Dot\'s answer with "Save as page".' }))
+  }
+  workButton.addEventListener('click', () => {
+    drawer.hidden = !drawer.hidden
+    clearInterval(drawerTimer)
+    if (!drawer.hidden) { void renderDrawer(); drawerTimer = setInterval(() => { void renderDrawer() }, 10_000) }
+  })
   function renderAll() { renderList(); renderTranscript(); renderStatus() }
 
   // --- actions --------------------------------------------------------------
@@ -148,7 +224,55 @@ export async function mount(root: HTMLElement, host: PanelHost, now: () => numbe
   const dot = selected()
   if (dot) transcript = [...await chat.select(dot)]
   renderAll()
-  return { dispose: async () => { unsubscribe(); await chat.dispose() } }
+  return { dispose: async () => { unsubscribe(); clearInterval(drawerTimer); await chat.dispose() } }
+}
+
+/** The review card before a page is written: title and content are the
+ *  human's to change; nothing is saved until they confirm. */
+function openPageReview(root: HTMLElement, draft: PageDraft): Promise<PageDraft | null> {
+  return new Promise(resolve => {
+    const title = el('input', { value: draft.title, maxLength: 120 })
+    const content = el('textarea', { value: draft.content })
+    const error = el('div', { class: 'error' })
+    const save = el('button', { class: 'primary', text: 'Save page', type: 'submit' })
+    const cancel = el('button', { text: 'Cancel', type: 'button' })
+    const form = el('form', { class: 'page-review' }, el('label', { text: 'Title' }, title), el('label', { text: 'Content (Markdown)' }, content), error,
+      el('div', { class: 'actions' }, el('div'), el('div', {}, cancel, save)))
+    const overlay = el('div', { class: 'editor' }, form)
+    const done = (result: PageDraft | null) => { overlay.remove(); resolve(result) }
+    form.addEventListener('submit', event => {
+      event.preventDefault()
+      const next: PageDraft = { ...draft, title: title.value, content: content.value }
+      const problem = validatePageDraft(next)
+      if (problem) { error.textContent = problem; return }
+      done(next)
+    })
+    cancel.addEventListener('click', () => done(null))
+    overlay.addEventListener('keydown', event => { if (event.key === 'Escape') done(null) })
+    root.style.position = 'relative'
+    root.append(overlay)
+    title.focus()
+  })
+}
+
+/** The form for a new scheduled task. */
+function taskForm(dots: readonly Dot[], submit: (draft: TaskDraft) => Promise<void>): HTMLFormElement {
+  const dot = el('select', {}, ...dots.map(d => el('option', { value: d.id, text: d.name })))
+  const title = el('input', { placeholder: 'Daily status', maxLength: 80 })
+  const prompt = el('textarea', { placeholder: 'What the Dot does each time.' })
+  const every = el('input', { type: 'number', value: '60', min: String(EVERY_MIN) })
+  const error = el('div', { class: 'error' })
+  const add = el('button', { class: 'primary small', text: 'Add task', type: 'submit' })
+  const form = el('form', { class: 'task-form' }, el('label', { text: 'Dot' }, dot), el('label', { text: 'Title' }, title), el('label', { text: 'Prompt' }, prompt), el('label', { text: 'Every (minutes)' }, every), error, add)
+  form.addEventListener('submit', event => {
+    event.preventDefault()
+    const draft: TaskDraft = { dotId: dot.value, title: title.value, prompt: prompt.value, everyMinutes: Number(every.value) }
+    const problem = validateTaskDraft(draft)
+    if (problem) { error.textContent = problem; return }
+    error.textContent = ''
+    void submit(draft).then(() => { title.value = ''; prompt.value = '' })
+  })
+  return form
 }
 
 interface ProfileOption { id: string; name: string; role: string }

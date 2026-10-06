@@ -32,13 +32,36 @@ for the catalog, with no hosted service behind it.
 
 ## Scopes
 
-`storage`, `theme`, `ui` and `agent`. The `agent` scope asks for the user's
-consent once per app session before the first conversation.
+`storage`, `theme`, `ui`, `agent`, `editor.write` (to open a saved page) and
+`workspace.read` (the project root, to open it by path). The `agent` scope asks
+for the user's consent once per app session before the first conversation.
+
+## Pages and scheduled work (server-backed, 0.2.0)
+
+The extension ships its own server (`dist/server.js`), spawned by Vibron per
+workspace. It serves the panel and owns two things a webview cannot:
+
+- **Pages.** "Save as page" on a Dot's answer opens a review card; nothing is
+  written until the human confirms. The page lands in
+  `<project>/.vibron/dots/pages/<slug>.md` with a small frontmatter (title,
+  date, Dot, source) and opens in the editor. A title already used gets its
+  own file; nothing is overwritten.
+- **Scheduled work.** A task is a Dot, a prompt and a period. While the server
+  is alive, a due task opens the Dot's session (on its profile), sends the
+  prompt with the instructions as preface, saves the answer as a page and
+  records the run (`ok`, `failed`, `deferred` when the agent is busy with the
+  panel's own session). A run the server did not see end is marked
+  `interrupted` on the next start, never completed. Tasks and runs live in the
+  extension's storage, so they survive restarts and the panel shows them.
+
+**Limit:** Vibron stops an extension's server 30 s after its last panel closes,
+so the schedule runs while the Dots panel is open. Keeping it alive with the
+workspace is a host change, not something the extension can do.
 
 ## Not yet
 
-Saving a conversation as a Markdown page and scheduled work; both need the
-server-backed shape of an extension.
+Pages are plain Markdown files: no visual editor, no search beyond the file
+tree. A Dot cannot delegate to another Dot.
 
 ## Development
 

@@ -40,8 +40,11 @@ export interface VibronAgentProfileInfo {
   description: string
   instructions: string
   origin: 'native' | 'custom'
-  /** The profile's configured route, when it has one. */
-  route?: { primary: VibronAgentModel; fallback?: VibronAgentModel; thinkingLevel?: string }
+  /** The profile's configured route, when it has one: what `open` applies
+   *  (the primary model, then the fallback when the primary is unavailable).
+   *  The route's reasoning level is not applied to extension sessions, so it
+   *  is not listed. */
+  route?: { primary: VibronAgentModel; fallback?: VibronAgentModel }
 }
 
 /** Workspace context handed to a guest by `vibron.workspace.get()`. */
@@ -186,13 +189,15 @@ export interface VibronHost {
    *  live session per extension; one turn in flight per session. */
   agent: {
     /** The enabled agent profiles (Settings → Agents). Needs the `agent` scope
-     *  but no consent: it starts nothing. */
+     *  but no consent: it starts nothing. The instructions are the user's own
+     *  text for that profile; a route is provider and model ids only. */
     profiles(): Promise<{ profiles: VibronAgentProfileInfo[] } | { error: string }>
     /** Open (or `resume` a previous) session; returns its handle and the model
-     *  it runs on. `profileId` opens it on that enabled profile's route
-     *  (`profile-unavailable` otherwise); `model` names one explicitly and
-     *  must be available (`model-unavailable`). The profile's instructions
-     *  are not injected: brief the model in the first prompt. */
+     *  it runs on. `profileId` opens it on that enabled profile's route,
+     *  primary then fallback (`profile-unavailable` for an unknown or disabled
+     *  profile); `model` names one explicitly, must be available
+     *  (`model-unavailable`) and wins over the profile's route. The profile's
+     *  instructions are not injected: brief the model in the first prompt. */
     open(opts?: { resume?: string; profileId?: string; model?: VibronAgentModel }): Promise<{ sessionId: string; model: VibronAgentModel | null; profileId?: string } | { error: string }>
     /** Run one turn on an open session; returns the final assistant message. */
     send(sessionId: string, prompt: string): Promise<CodingTurnResult | { error: string }>
