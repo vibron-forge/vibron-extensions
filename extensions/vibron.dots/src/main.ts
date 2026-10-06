@@ -141,7 +141,16 @@ export async function mount(root: HTMLElement, host: PanelHost, now: () => numbe
     const dotName = (id: string) => state.dots.find(dot => dot.id === id)?.name ?? id
     const when = (at: number) => at ? new Date(at).toLocaleString() : 'never'
     const tasks = el('ul', { class: 'tasks' }, ...schedule.tasks.map(task => {
-      const act = (action: 'pause' | 'resume' | 'run' | 'delete', label: string) => { const b = el('button', { class: 'small', text: label }); b.addEventListener('click', () => { void api.taskAction(task.id, action).then(renderDrawer, error => host.ui?.notify(String(error), 'error')) }); return b }
+      const act = (action: 'pause' | 'resume' | 'run' | 'delete', label: string) => {
+        const b = el('button', { class: 'small', text: label })
+        b.addEventListener('click', () => { void (async () => {
+          // Vibron allows one live agent session per extension: a run needs the
+          // panel's own session released first (it resumes on the next send).
+          if (action === 'run') { if (chat.busy()) { await host.ui?.notify('Wait for the running turn before running a task.', 'warn'); return } await chat.dispose() }
+          await api.taskAction(task.id, action).then(renderDrawer, error => host.ui?.notify(String(error), 'error'))
+        })() })
+        return b
+      }
       const last = [...schedule!.runs].reverse().find(run => run.taskId === task.id)
       const item = el('li', {}, el('div', { class: 'name', text: `${task.title} · ${dotName(task.dotId)} · every ${task.everyMinutes} min${task.paused ? ' · paused' : ''}` }),
         el('div', { class: 'role', text: last ? `last run ${when(last.startedAt)}: ${last.status}${last.pageRelPath ? ` → ${last.pageRelPath}` : last.detail ? ` (${last.detail})` : ''}` : 'not run yet' }),
@@ -179,14 +188,20 @@ export async function mount(root: HTMLElement, host: PanelHost, now: () => numbe
     transcript = dot ? [...await chat.select(dot)] : []
     renderAll()
   }
+  // The panel's live session blocks scheduled runs (one session per extension),
+  // so an idle conversation releases it; the next send resumes it unchanged.
+  let lastTurnAt = now()
+  const IDLE_RELEASE_MS = 120_000
+  const idleTimer = setInterval(() => { if (chat.currentDotId() && !chat.busy() && now() - lastTurnAt > IDLE_RELEASE_MS) void chat.dispose() }, 15_000)
   async function send() {
     const dot = selected()
     const text = input.value
     if (!dot || !text.trim() || chat.busy()) return
+    lastTurnAt = now()
     input.value = ''
     renderStatus()
     const ticking = setInterval(renderStatus, 500)
-    try { await chat.send(dot, text) } catch (error) { await host.ui?.notify(error instanceof Error ? error.message : String(error), 'error') } finally { clearInterval(ticking); renderStatus() }
+    try { await chat.send(dot, text) } catch (error) { await host.ui?.notify(error instanceof Error ? error.message : String(error), 'error') } finally { clearInterval(ticking); lastTurnAt = now(); renderStatus() }
   }
   async function edit(existing: Dot | null) {
     let profiles: ProfileOption[] = []
@@ -224,7 +239,7 @@ export async function mount(root: HTMLElement, host: PanelHost, now: () => numbe
   const dot = selected()
   if (dot) transcript = [...await chat.select(dot)]
   renderAll()
-  return { dispose: async () => { unsubscribe(); clearInterval(drawerTimer); await chat.dispose() } }
+  return { dispose: async () => { unsubscribe(); clearInterval(drawerTimer); clearInterval(idleTimer); await chat.dispose() } }
 }
 
 /** The review card before a page is written: title and content are the
