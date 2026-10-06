@@ -24,8 +24,11 @@ for the catalog, with no hosted service behind it.
   pi keeps the full history in its session file; the panel keeps a bounded
   transcript for display.
 - The Dot's instructions are sent as the preface of its first turn on a
-  session. There is no host API to pick a profile or a model per session yet,
-  so every Dot runs on the agent's default model.
+  session. A Dot can name a Vibron agent profile (Settings → Agents, listed by
+  `vibron.agent.profiles()`): its session then opens on that profile's route,
+  and the header shows the model. A profile that is not enabled falls back to
+  the agent's default model, with a note in the transcript. The seeded Dots
+  name `planner`, `coding`, `qa` and `research`.
 
 ## Scopes
 
@@ -34,9 +37,8 @@ consent once per app session before the first conversation.
 
 ## Not yet
 
-Saving a conversation as a Markdown page, scheduled work, and mapping a Dot to a
-Vibron agent profile. The first two need the server-backed shape of an
-extension; the third needs a host verb.
+Saving a conversation as a Markdown page and scheduled work; both need the
+server-backed shape of an extension.
 
 ## Development
 

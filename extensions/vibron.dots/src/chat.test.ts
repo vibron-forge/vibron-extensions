@@ -2,25 +2,28 @@ import { describe, expect, it, vi } from 'vitest'
 import { createDotChat, type ChatHost } from './chat'
 import { SESSIONS_KEY, TRANSCRIPT_KEY, type Dot } from './state'
 
-const planner: Dot = { id: 'planner', name: 'Planner', role: 'Plans.', instructions: 'Plan first.', createdAt: 1 }
+const planner: Dot = { id: 'planner', name: 'Planner', role: 'Plans.', instructions: 'Plan first.', profileId: 'planner', createdAt: 1 }
 const coder: Dot = { id: 'coding', name: 'Coding', role: 'Codes.', instructions: '', createdAt: 1 }
 
 /** A host that behaves like Vibron's: one live session per extension, one turn
  *  in flight, and `resume` accepted only for ids it handed out. */
-function fakeHost(options: { resumeFails?: boolean; sendError?: string } = {}) {
+function fakeHost(options: { resumeFails?: boolean; sendError?: string; enabledProfiles?: string[] } = {}) {
   const store = new Map<string, unknown>()
   let live: string | null = null
   let opened = 0
   let inFlight = false
   const prompts: string[] = []
+  const enabled = options.enabledProfiles ?? ['planner']
   const host: ChatHost = {
     storage: { get: async key => store.get(key), set: async (key, value) => { store.set(key, JSON.parse(JSON.stringify(value))) } },
     agent: {
-      open: vi.fn(async (opts?: { resume?: string }) => {
+      profiles: vi.fn(async () => ({ profiles: enabled.map(id => ({ id, name: id, role: id, description: '', instructions: '', origin: 'native' as const, route: { primary: { provider: 'p', model: `${id}-model` } } })) })),
+      open: vi.fn(async (opts?: { resume?: string; profileId?: string }) => {
         if (live) return { error: 'agent-busy' }
+        if (opts?.profileId && !enabled.includes(opts.profileId)) return { error: 'profile-unavailable' }
         if (opts?.resume && (options.resumeFails || !opts.resume.startsWith('/s/'))) return { error: 'invalid-resume' }
         live = opts?.resume ?? `/s/${++opened}.jsonl`
-        return { sessionId: live }
+        return { sessionId: live, model: opts?.profileId ? { provider: 'p', model: `${opts.profileId}-model` } : null, ...(opts?.profileId ? { profileId: opts.profileId } : {}) }
       }),
       send: vi.fn(async (sessionId: string, prompt: string) => {
         if (sessionId !== live) return { error: 'no-session' }
@@ -53,6 +56,28 @@ describe('dot chat', () => {
     expect(f.store.get(SESSIONS_KEY)).toEqual({ planner: '/s/1.jsonl' })
     expect(changed).toHaveBeenCalledTimes(4)
     expect(chat.status()).toBe('idle')
+    // The session opened on the Dot's profile, and the host's answer names the model.
+    expect(f.host.agent.open).toHaveBeenCalledWith({ profileId: 'planner' })
+    expect(chat.currentModel()).toEqual({ provider: 'p', model: 'planner-model' })
+  })
+
+  it('a Dot whose profile is not enabled runs on the default model, and the transcript says so', async () => {
+    const f = fakeHost({ enabledProfiles: [] })
+    const chat = createDotChat({ host: f.host, now: () => 1, changed: () => {} })
+    await chat.send(planner, 'hello')
+    expect(f.host.agent.open).toHaveBeenNthCalledWith(1, { profileId: 'planner' })
+    expect(f.host.agent.open).toHaveBeenNthCalledWith(2, {})
+    expect(chat.currentModel()).toBeNull()
+    const transcript = f.store.get(TRANSCRIPT_KEY('planner')) as { role: string; text: string }[]
+    expect(transcript.map(e => e.role)).toEqual(['note', 'you', 'dot'])
+    expect(transcript[0]?.text).toBe('Profile "planner" is not enabled; running on the agent\'s default model.')
+    // Resumed later with the profile enabled again: the resume carries the profile.
+    await chat.dispose()
+    const g = fakeHost({ enabledProfiles: ['planner'] })
+    g.store.set(SESSIONS_KEY, { planner: '/s/9.jsonl' })
+    const again = createDotChat({ host: g.host, now: () => 1, changed: () => {} })
+    await again.send(planner, 'more')
+    expect(g.host.agent.open).toHaveBeenCalledWith({ resume: '/s/9.jsonl', profileId: 'planner' })
   })
 
   it('switching Dots disposes the live session and resumes the other Dot\'s own session', async () => {
@@ -65,7 +90,7 @@ describe('dot chat', () => {
     expect(f.prompts[1]).toBe('b')
     // Back to the planner: resumed, so no preface again.
     await chat.send(planner, 'c')
-    expect(f.host.agent.open).toHaveBeenLastCalledWith({ resume: '/s/1.jsonl' })
+    expect(f.host.agent.open).toHaveBeenLastCalledWith({ resume: '/s/1.jsonl', profileId: 'planner' })
     expect(f.prompts[2]).toBe('c')
     expect(f.opened()).toBe(2)
   })

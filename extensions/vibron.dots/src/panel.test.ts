@@ -16,7 +16,8 @@ function fakeHost() {
       onChange: cb => { listeners.add(cb); return () => { listeners.delete(cb) } },
     },
     agent: {
-      open: vi.fn(async () => { live = `/s/${store.size}.jsonl`; return { sessionId: live } }),
+      profiles: vi.fn(async () => ({ profiles: [] })),
+      open: vi.fn(async (opts?: { profileId?: string }) => { live = `/s/${store.size}.jsonl`; return { sessionId: live, model: opts?.profileId ? { provider: 'p', model: `${opts.profileId}-model` } : null } }),
       send: vi.fn(async (_id: string, prompt: string) => ({ text: `ok: ${prompt.split('\n').at(-1)}`, message: null })),
       dispose: vi.fn(async () => { live = null }),
       cancel: vi.fn(async () => {}),
@@ -44,8 +45,9 @@ describe('panel', () => {
     input.value = 'Plan it'
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
     await flush(); await flush(); await flush()
-    expect(f.host.agent.open).toHaveBeenCalledTimes(1)
+    expect(f.host.agent.open).toHaveBeenCalledWith({ profileId: 'planner' })
     expect([...root.querySelectorAll('.entry')].map(e => [e.getAttribute('data-role'), e.textContent])).toEqual([['you', 'Plan it'], ['dot', 'ok: Plan it']])
+    expect(root.querySelector('.dots-chat .status')?.textContent).toBe('p/planner-model')
     expect(f.store.get(STATE_KEY)).toMatchObject({ version: 1, selectedId: 'planner' })
 
     // Selecting another Dot shows its own (empty) transcript and disposes the live session.

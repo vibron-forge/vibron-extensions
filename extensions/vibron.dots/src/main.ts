@@ -74,7 +74,10 @@ export async function mount(root: HTMLElement, host: PanelHost, now: () => numbe
   function renderStatus() {
     const current = chat.status()
     status.dataset.status = current
-    status.textContent = current === 'thinking' ? 'thinking…' : current === 'opening' ? 'opening session…' : current === 'error' ? 'last turn failed' : ''
+    const model = chat.currentModel()
+    const dot = selected()
+    const where = chat.currentDotId() === dot?.id && model ? `${model.provider}/${model.model}` : dot?.profileId ? `profile ${dot.profileId}` : ''
+    status.textContent = current === 'thinking' ? 'thinking…' : current === 'opening' ? 'opening session…' : current === 'error' ? 'last turn failed' : where
     sendButton.disabled = chat.busy() || !selected()
     cancelButton.disabled = !chat.busy()
     input.disabled = !selected()
@@ -110,7 +113,9 @@ export async function mount(root: HTMLElement, host: PanelHost, now: () => numbe
     try { await chat.send(dot, text) } catch (error) { await host.ui?.notify(error instanceof Error ? error.message : String(error), 'error') } finally { clearInterval(ticking); renderStatus() }
   }
   async function edit(existing: Dot | null) {
-    const draft = await openEditor(root, existing)
+    let profiles: ProfileOption[] = []
+    try { const listed = await host.agent.profiles(); if ('profiles' in listed) profiles = listed.profiles.map(p => ({ id: p.id, name: p.name, role: p.role })) } catch { /* no profile list: the field stays free text */ }
+    const draft = await openEditor(root, existing, profiles)
     if (!draft) return
     if (draft === 'delete' && existing) {
       if (chat.currentDotId() === existing.id) await chat.reset(existing)
@@ -146,25 +151,34 @@ export async function mount(root: HTMLElement, host: PanelHost, now: () => numbe
   return { dispose: async () => { unsubscribe(); await chat.dispose() } }
 }
 
+interface ProfileOption { id: string; name: string; role: string }
+
 /** A modal form for a new or existing Dot. Resolves with the draft, 'delete',
- *  or null when dismissed. */
-function openEditor(root: HTMLElement, existing: Dot | null): Promise<DotDraft | 'delete' | null> {
+ *  or null when dismissed. `profiles` are the enabled agent profiles the Dot
+ *  can run on; a profile the host no longer lists is kept selectable so an
+ *  edit does not drop it silently. */
+function openEditor(root: HTMLElement, existing: Dot | null, profiles: ProfileOption[]): Promise<DotDraft | 'delete' | null> {
   return new Promise(resolve => {
     const name = el('input', { value: existing?.name ?? '', maxLength: 60, placeholder: 'Reviewer' })
     const role = el('input', { value: existing?.role ?? '', maxLength: 160, placeholder: 'Reviews a change for correctness.' })
     const instructions = el('textarea', { value: existing?.instructions ?? '', placeholder: 'The standing instructions this Dot works under.' })
+    const options = [...profiles]
+    if (existing?.profileId && !options.some(p => p.id === existing.profileId)) options.push({ id: existing.profileId, name: existing.profileId, role: 'not enabled' })
+    const profile = el('select', {}, el('option', { value: '', text: 'Agent default model' }),
+      ...options.map(p => el('option', { value: p.id, text: `${p.name} (${p.role})` })))
+    profile.value = existing?.profileId ?? ''
     const error = el('div', { class: 'error' })
     const save = el('button', { class: 'primary', text: existing ? 'Save' : 'Create', type: 'submit' })
     const cancel = el('button', { text: 'Cancel', type: 'button' })
     const remove = el('button', { class: 'danger', text: 'Delete', type: 'button' })
     const form = el('form', {},
-      el('label', { text: 'Name' }, name), el('label', { text: 'Role' }, role), el('label', { text: 'Instructions' }, instructions), error,
+      el('label', { text: 'Name' }, name), el('label', { text: 'Role' }, role), el('label', { text: 'Runs on' }, profile), el('label', { text: 'Instructions' }, instructions), error,
       el('div', { class: 'actions' }, el('div', {}, ...(existing ? [remove] : [])), el('div', {}, cancel, save)))
     const overlay = el('div', { class: 'editor' }, form)
     const done = (result: DotDraft | 'delete' | null) => { overlay.remove(); resolve(result) }
     form.addEventListener('submit', event => {
       event.preventDefault()
-      const draft: DotDraft = { name: name.value, role: role.value, instructions: instructions.value }
+      const draft: DotDraft = { name: name.value, role: role.value, instructions: instructions.value, ...(profile.value ? { profileId: profile.value } : {}) }
       if (!draft.name.trim()) { error.textContent = 'A Dot needs a name.'; return }
       done(draft)
     })

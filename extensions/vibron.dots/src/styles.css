@@ -45,7 +45,7 @@ button.small { padding: 3px 8px; font-size: 12px; }
 .editor { position: absolute; inset: 0; background: color-mix(in srgb, var(--dots-bg) 70%, transparent); display: grid; place-items: center; }
 .editor form { width: min(560px, 92vw); background: var(--dots-bg); border: 1px solid var(--dots-border); border-radius: 10px; padding: 16px; display: grid; gap: 10px; }
 .editor label { display: grid; gap: 4px; font-size: 12px; color: var(--dots-fg-2); }
-.editor input, .editor textarea { background: var(--dots-bg-2); color: var(--dots-fg); border: 1px solid var(--dots-border); border-radius: 6px; padding: 8px 10px; font: inherit; }
+.editor input, .editor textarea, .editor select { background: var(--dots-bg-2); color: var(--dots-fg); border: 1px solid var(--dots-border); border-radius: 6px; padding: 8px 10px; font: inherit; }
 .editor textarea { min-height: 140px; resize: vertical; }
 .editor .actions { display: flex; justify-content: space-between; gap: 8px; }
 .editor .actions > div { display: flex; gap: 8px; }

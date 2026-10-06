@@ -24,6 +24,26 @@ export interface CodingTurnResult {
   message: Record<string, unknown> | null
 }
 
+/** A model reference as the agent names one: a provider id and its model id. */
+export interface VibronAgentModel {
+  provider: string
+  model: string
+}
+
+/** One enabled agent profile, as `vibron.agent.profiles()` lists them: what
+ *  Settings → Agents shows, so a session can be briefed with its instructions
+ *  and opened on its route. */
+export interface VibronAgentProfileInfo {
+  id: string
+  name: string
+  role: string
+  description: string
+  instructions: string
+  origin: 'native' | 'custom'
+  /** The profile's configured route, when it has one. */
+  route?: { primary: VibronAgentModel; fallback?: VibronAgentModel; thinkingLevel?: string }
+}
+
 /** Workspace context handed to a guest by `vibron.workspace.get()`. */
 export interface VibronHostWorkspace {
   rootPath: string | null
@@ -165,8 +185,15 @@ export interface VibronHost {
    *  resolves on the agent's terminal `agent_end` (a turn can take minutes). One
    *  live session per extension; one turn in flight per session. */
   agent: {
-    /** Open (or `resume` a previous) session; returns its handle. */
-    open(opts?: { resume?: string }): Promise<{ sessionId: string } | { error: string }>
+    /** The enabled agent profiles (Settings → Agents). Needs the `agent` scope
+     *  but no consent: it starts nothing. */
+    profiles(): Promise<{ profiles: VibronAgentProfileInfo[] } | { error: string }>
+    /** Open (or `resume` a previous) session; returns its handle and the model
+     *  it runs on. `profileId` opens it on that enabled profile's route
+     *  (`profile-unavailable` otherwise); `model` names one explicitly and
+     *  must be available (`model-unavailable`). The profile's instructions
+     *  are not injected: brief the model in the first prompt. */
+    open(opts?: { resume?: string; profileId?: string; model?: VibronAgentModel }): Promise<{ sessionId: string; model: VibronAgentModel | null; profileId?: string } | { error: string }>
     /** Run one turn on an open session; returns the final assistant message. */
     send(sessionId: string, prompt: string): Promise<CodingTurnResult | { error: string }>
     /** Tear down the live session (pi's jsonl stays; reopen via `resume`). */

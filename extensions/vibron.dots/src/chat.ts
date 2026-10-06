@@ -31,7 +31,7 @@ const message = (error: unknown): string => error instanceof Error ? error.messa
 
 export function createDotChat(ports: ChatPorts) {
   const { host } = ports
-  let current: { dot: Dot; sessionId: string; turns: number } | null = null
+  let current: { dot: Dot; sessionId: string; turns: number; model: { provider: string; model: string } | null } | null = null
   let busy = false
   let status: ChatStatus = 'idle'
   const transcripts = new Map<string, TranscriptEntry[]>()
@@ -70,18 +70,26 @@ export function createDotChat(ports: ChatPorts) {
     try { await host.agent.dispose(live.sessionId) } catch { /* the host already dropped it */ }
   }
 
-  /** Opens the Dot's session, resuming the one it had. A resume the host
-   *  refuses (file gone, moved project) falls back to a fresh session, and
-   *  the transcript says so. */
+  /** Opens the Dot's session, resuming the one it had, on its profile's route
+   *  when it names an enabled profile. A resume the host refuses (file gone,
+   *  moved project) falls back to a fresh session; a profile the host refuses
+   *  (disabled, removed) falls back to the default model. Both are said in
+   *  the transcript, never silent. */
   async function open(dot: Dot): Promise<string | null> {
     status = 'opening'
     const known = (await sessions())[dot.id]
-    let result = await host.agent.open(known ? { resume: known } : undefined)
+    const profile = dot.profileId ? { profileId: dot.profileId } : {}
+    let result = await host.agent.open({ ...(known ? { resume: known } : {}), ...profile })
     let fresh = !known
+    if ('error' in result && result.error === 'profile-unavailable' && dot.profileId) {
+      await file(dot.id, { role: 'note', text: `Profile "${dot.profileId}" is not enabled; running on the agent's default model.` })
+      result = await host.agent.open(known ? { resume: known } : {})
+    }
     if ('error' in result && known) {
       await file(dot.id, { role: 'note', text: `Previous session could not be resumed (${result.error}); starting a new one.` })
       await remember(dot.id, null)
-      result = await host.agent.open()
+      result = await host.agent.open(profile)
+      if ('error' in result && result.error === 'profile-unavailable') result = await host.agent.open({})
       fresh = true
     }
     if ('error' in result) {
@@ -89,7 +97,7 @@ export function createDotChat(ports: ChatPorts) {
       await file(dot.id, { role: 'error', text: `Could not open a session: ${result.error}` })
       return null
     }
-    current = { dot, sessionId: result.sessionId, turns: fresh ? 0 : 1 }
+    current = { dot, sessionId: result.sessionId, turns: fresh ? 0 : 1, model: result.model ?? null }
     await remember(dot.id, result.sessionId)
     status = 'idle'
     return result.sessionId
@@ -99,6 +107,8 @@ export function createDotChat(ports: ChatPorts) {
     status: () => status,
     busy: () => busy,
     currentDotId: () => current?.dot.id ?? null,
+    /** The model the live session runs on, as the host reported it. */
+    currentModel: () => current?.model ?? null,
     transcriptOf,
 
     /** Makes `dot` the one the panel talks to. Only the transcript is loaded

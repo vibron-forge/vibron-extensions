@@ -12,6 +12,18 @@ describe('state', () => {
     expect(state.dots.map(d => d.id)).toEqual(['planner', 'coding', 'reviewer', 'researcher'])
     expect(state.selectedId).toBe('planner')
     expect(state.dots.every(d => d.createdAt === 7 && d.instructions.length > 0)).toBe(true)
+    expect(state.dots.map(d => d.profileId)).toEqual(['planner', 'coding', 'qa', 'research'])
+  })
+
+  it('keeps a profile id through sanitizing and editing, and drops it when cleared', () => {
+    const state = sanitizeState({ version: 1, dots: [{ id: 'a', name: 'A', profileId: ' qa ' }, { id: 'b', name: 'B', profileId: 7 }] }, 1)
+    expect(state.dots.map(d => d.profileId)).toEqual(['qa', undefined])
+    const edited = updateDot(state, 'a', { name: 'A', role: '', instructions: '', profileId: '' })
+    if ('error' in edited) throw new Error(edited.error)
+    expect(edited.dots[0]).not.toHaveProperty('profileId')
+    const added = addDot(state, { name: 'C', role: '', instructions: '', profileId: 'coding' }, 2)
+    if ('error' in added) throw new Error(added.error)
+    expect(added.dot.profileId).toBe('coding')
   })
 
   it('sanitizes a hand-edited or older file: bad ids, duplicates, overlong text, dangling selection', () => {
