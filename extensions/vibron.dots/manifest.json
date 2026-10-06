@@ -1,0 +1,17 @@
+{
+  "id": "vibron.dots",
+  "name": "Dots",
+  "version": "0.1.0",
+  "category": "ai",
+  "description": "Named specialists with their own instructions, each with its own conversation on Vibron's embedded agent. Define a planner, a reviewer, a researcher; talk to one at a time; the history is kept per specialist.",
+  "frontend": "dist/index.html",
+  "panels": [
+    {
+      "id": "main",
+      "label": "Dots",
+      "icon": "<svg viewBox=\"0 0 16 16\" xmlns=\"http://www.w3.org/2000/svg\"><circle cx=\"4\" cy=\"8\" r=\"2\" fill=\"currentColor\"/><circle cx=\"10.5\" cy=\"4.5\" r=\"2\" fill=\"none\" stroke=\"currentColor\"/><circle cx=\"10.5\" cy=\"11.5\" r=\"2\" fill=\"none\" stroke=\"currentColor\"/><path d=\"M5.8 7.2l2.9-1.8M5.8 8.8l2.9 1.8\" stroke=\"currentColor\"/></svg>",
+      "defaultSize": { "width": 900, "height": 640 }
+    }
+  ],
+  "vibronApi": ["storage", "theme", "ui", "agent"]
+}
