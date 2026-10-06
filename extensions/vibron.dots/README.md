@@ -54,9 +54,11 @@ workspace. It serves the panel and owns two things a webview cannot:
   `interrupted` on the next start, never completed. Tasks and runs live in the
   extension's storage, so they survive restarts and the panel shows them.
 
-**Limits:** Vibron stops an extension's server 30 s after its last panel
-closes, so the schedule runs while the Dots panel is open; keeping it alive
-with the workspace is a host change, not something the extension can do. And
+**Limits:** the manifest declares `server.keepAlive`, so on a Vibron that
+honours it the server outlives the panel and the schedule keeps running for
+the workspace's life in that app session (it still starts when the panel is
+first opened); on an older Vibron the server stops 30 s after the last panel
+closes, and the schedule runs while the panel is open. And
 Vibron allows one live agent session per extension, so a run is `deferred`
 while the panel holds a conversation: "Run now" releases the panel's session
 first, and an idle conversation is released after two minutes (it resumes on
