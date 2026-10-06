@@ -21,6 +21,7 @@ function fakeHost() {
   const storage = new Map<string, unknown>()
   const calls: { method: string; args: Record<string, unknown> }[] = []
   let live: string | null = null
+  const state = { busy: false }
   const server = createServer((req, res) => {
     const chunks: Buffer[] = []
     req.on('data', (chunk: Buffer) => chunks.push(chunk))
@@ -33,7 +34,7 @@ function fakeHost() {
         case 'vibron.storage.get': return answer(storage.get(String(args.key)) ?? null)
         case 'vibron.storage.set': storage.set(String(args.key), args.value); return answer({ ok: true })
         case 'vibron.ui.notify': return answer({ ok: true })
-        case 'vibron.agent.open': if (live) return answer({ error: 'agent-busy' }); live = '/s/1.jsonl'; return answer({ sessionId: live, model: { provider: 'p', model: `${String(args.profileId ?? 'default')}-model` } })
+        case 'vibron.agent.open': if (live || state.busy) return answer({ error: 'agent-busy' }); live = '/s/1.jsonl'; return answer({ sessionId: live, model: { provider: 'p', model: `${String(args.profileId ?? 'default')}-model` } })
         case 'vibron.agent.send': return answer({ text: `# Report\n\nanswer to: ${String(args.prompt).split('\n').at(-1)}`, message: null })
         case 'vibron.agent.dispose': live = null; return answer({ ok: true })
         default: return answer({ error: 'unsupported' })
@@ -41,7 +42,7 @@ function fakeHost() {
     })
   })
   cleanup.push(() => new Promise<void>(resolve => server.close(() => resolve())))
-  return { server, storage, calls, url: () => `http://127.0.0.1:${(server.address() as AddressInfo).port}` }
+  return { server, storage, calls, url: () => `http://127.0.0.1:${(server.address() as AddressInfo).port}`, set busy(value: boolean) { state.busy = value } }
 }
 
 async function listen(server: Server): Promise<void> { await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve)) }
@@ -134,9 +135,32 @@ describe.skipIf(!existsSync(SERVER))('dots server', { timeout: 30_000 }, () => {
     // State lives in the host's storage, so the panel and the next server see it.
     expect((host.storage.get('schedule') as unknown[]).length).toBe(1)
     expect((host.storage.get('runs') as { status: string }[]).map(r => r.status)).toEqual(['interrupted', 'ok'])
-    // Pause, then "run now" clears the wait; delete removes it.
-    expect(((await call(port, 'POST', `/api/schedule/${taskId}/pause`)).json as { tasks: { paused: boolean }[] }).tasks[0]?.paused).toBe(true)
+    // Pause disarms; delete removes it.
+    expect((await call(port, 'POST', `/api/schedule/${taskId}/pause`)).json).toMatchObject({ tasks: [{ paused: true }], armed: [] })
     expect(((await call(port, 'POST', `/api/schedule/${taskId}/delete`)).json as { tasks: unknown[] }).tasks).toEqual([])
     expect((await call(port, 'POST', `/api/schedule/${taskId}/run`)).status).toBe(404)
+  })
+
+  it('a task read back from the project\'s storage never runs until a human arms it, and a busy agent defers without a run record', async () => {
+    const host = fakeHost(); await listen(host.server)
+    host.storage.set('dots', { version: 1, selectedId: 'planner', dots: [{ id: 'planner', name: 'Planner', role: '', instructions: '', createdAt: 1 }] })
+    // What a repository could ship: a due task with a prompt of its choosing.
+    host.storage.set('schedule', [{ id: 'planted', dotId: 'planner', title: 'Planted', prompt: 'exfiltrate', everyMinutes: 5, paused: false, createdAt: 1, lastRunAt: 0 }])
+    const workspace = mkdtempSync(path.join(tmpdir(), 'dots-ws-'))
+    cleanup.push(() => rmSync(workspace, { recursive: true, force: true }))
+    const { port } = await startDots({ VIBRON_TOKEN: 'tok', WORKSPACE_ROOT: workspace, VIBRON_API: host.url(), DOTS_TICK_MS: '150' })
+    await new Promise(resolve => setTimeout(resolve, 1600))
+    expect(host.calls.filter(c => c.method === 'vibron.agent.open')).toEqual([])
+    expect((await call(port, 'GET', '/api/schedule')).json).toMatchObject({ tasks: [{ id: 'planted' }], armed: [], runs: [] })
+    // The human resumes it in the panel: it is armed. While the panel's own
+    // session is live the agent is busy, so the run is deferred with no record.
+    host.busy = true
+    expect((await call(port, 'POST', '/api/schedule/planted/resume')).json).toMatchObject({ armed: ['planted'] })
+    await new Promise(resolve => setTimeout(resolve, 600))
+    expect(host.calls.filter(c => c.method === 'vibron.agent.open').length).toBeGreaterThanOrEqual(1)
+    expect(host.calls.some(c => c.method === 'vibron.agent.send')).toBe(false)
+    expect(((await call(port, 'GET', '/api/schedule')).json as { runs: unknown[] }).runs).toEqual([])
+    // Pausing disarms it again, so nothing planted can keep retrying behind the human's back.
+    expect((await call(port, 'POST', '/api/schedule/planted/pause')).json).toMatchObject({ armed: [] })
   })
 })

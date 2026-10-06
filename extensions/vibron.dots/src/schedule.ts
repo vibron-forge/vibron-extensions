@@ -28,6 +28,17 @@ export interface ScheduledTask {
   lastRunAt: number
 }
 
+/** What arms a task: a human action in the panel, in this server's life.
+ *  Tasks read back from storage start disarmed, because `storage.json` is a
+ *  file in the project and a repository could ship it; nothing planted there
+ *  runs a model turn until someone resumes it or runs it in the panel. The
+ *  arming is in memory on purpose: a restart asks again. */
+export type ArmedTasks = Set<string>
+
+export function armed(tasks: readonly ScheduledTask[], armedIds: ArmedTasks): ScheduledTask[] {
+  return tasks.filter(task => armedIds.has(task.id))
+}
+
 export type RunStatus = 'running' | 'ok' | 'failed' | 'interrupted' | 'deferred'
 
 export interface TaskRun {
@@ -111,8 +122,8 @@ export function appendRun(runs: readonly TaskRun[], run: TaskRun): TaskRun[] {
 }
 
 /** A server that starts and finds a run still `running` did not see it end:
- *  it is `interrupted`, waiting for an explicit retry. Never completed on
- *  anyone's behalf. */
+ *  it is `interrupted`. Never completed on anyone's behalf; the task runs
+ *  again on its next period once it is armed. */
 export function settleInterrupted(runs: readonly TaskRun[], now: number): TaskRun[] {
   return runs.map(run => run.status === 'running' ? { ...run, status: 'interrupted' as const, endedAt: now, detail: 'The Dots server stopped while this run was in progress.' } : run)
 }

@@ -47,12 +47,21 @@ workspace. It serves the panel and owns two things a webview cannot:
   date, Dot, source) and opens in the editor. A title already used gets its
   own file; nothing is overwritten.
 - **Scheduled work.** A task is a Dot, a prompt and a period. While the server
-  is alive, a due task opens the Dot's session (on its profile), sends the
-  prompt with the instructions as preface, saves the answer as a page and
-  records the run (`ok`, `failed`, `deferred` when the agent is busy with the
-  panel's own session). A run the server did not see end is marked
+  is alive, a due, armed task opens the Dot's session (on its profile), sends
+  the prompt with the instructions as preface, saves the answer as a page and
+  records the run (`ok` or `failed`; a run the agent was busy for is deferred a
+  minute, with no record). A run the server did not see end is marked
   `interrupted` on the next start, never completed. Tasks and runs live in the
   extension's storage, so they survive restarts and the panel shows them.
+- **Arming.** The storage file lives in the project, and a repository could
+  ship one. So a task read back from storage is *not armed*: it never runs a
+  model turn until a human resumes it or runs it in the panel, in that
+  server's life. A task created in the panel is armed by that creation;
+  pausing disarms. The panel shows each task's prompt next to its state.
+- **Confinement.** Pages are written only under `.vibron/dots/pages` of the
+  real workspace root; a symbolic link anywhere on that path refuses the
+  write. A turn that does not answer in 15 minutes is cancelled and the run
+  fails; "Cancel running turn" in the panel does the same at once.
 
 **Limits:** the manifest declares `server.keepAlive`, so on a Vibron that
 honours it the server outlives the panel and the schedule keeps running for

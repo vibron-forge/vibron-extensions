@@ -36,9 +36,13 @@ export function validSlug(value: unknown): value is string {
   return typeof value === 'string' && /^[a-z0-9][a-z0-9-]{0,79}$/.test(value)
 }
 
+/** Windows device names cannot be file names, whatever the extension. */
+const RESERVED = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/
+
 export function slugify(title: string): string {
   const base = title.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60)
-  return base || 'page'
+  if (!base) return 'page'
+  return RESERVED.test(base) ? `${base}-page` : base
 }
 
 /** A slug no existing page uses: `title`, then `title-2`, `title-3`, … */

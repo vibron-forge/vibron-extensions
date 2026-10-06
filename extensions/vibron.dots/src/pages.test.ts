@@ -5,6 +5,8 @@ describe('pages', () => {
   it('slugs are file names under the pages dir and nothing else', () => {
     expect(slugify('Revisão do PR #12!')).toBe('revisao-do-pr-12')
     expect(slugify('***')).toBe('page')
+    expect(slugify('CON')).toBe('con-page')
+    expect(slugify('com1')).toBe('com1-page')
     expect(uniqueSlug('Plan', ['plan', 'plan-2'])).toBe('plan-3')
     for (const bad of ['../x', 'a/b', 'A', '', 'x'.repeat(81), '.hidden']) expect(validSlug(bad)).toBe(false)
     expect(validSlug('plan-3')).toBe(true)

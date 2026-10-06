@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { RUNS_MAX, appendRun, isDue, newTask, nextDue, sanitizeRuns, sanitizeTasks, settleInterrupted, validateTaskDraft, type TaskRun } from './schedule'
+import { RUNS_MAX, appendRun, armed, isDue, newTask, nextDue, sanitizeRuns, sanitizeTasks, settleInterrupted, validateTaskDraft, type TaskRun } from './schedule'
 
 const minute = 60_000
 
@@ -21,6 +21,9 @@ describe('schedule', () => {
     expect(isDue(b, 15 * minute)).toBe(true)
     expect(nextDue([b, a, c], 20 * minute)?.id).toBe('a')
     expect(nextDue([c], 20 * minute)).toBeNull()
+    // Only armed tasks are candidates: a stored task nobody touched in this server's life is not.
+    expect(nextDue(armed([b, a, c], new Set(['b'])), 20 * minute)?.id).toBe('b')
+    expect(nextDue(armed([a], new Set()), 20 * minute)).toBeNull()
   })
 
   it('reads stored tasks and runs back defensively', () => {

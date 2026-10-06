@@ -152,11 +152,16 @@ export async function mount(root: HTMLElement, host: PanelHost, now: () => numbe
         return b
       }
       const last = [...schedule!.runs].reverse().find(run => run.taskId === task.id)
-      const item = el('li', {}, el('div', { class: 'name', text: `${task.title} · ${dotName(task.dotId)} · every ${task.everyMinutes} min${task.paused ? ' · paused' : ''}` }),
+      const isArmed = schedule!.armed.includes(task.id)
+      // A task read back from storage is not armed until a human resumes or runs it here.
+      const state = task.paused ? 'paused' : isArmed ? 'armed' : 'not armed: resume to let it run'
+      const item = el('li', {}, el('div', { class: 'name', text: `${task.title} · ${dotName(task.dotId)} · every ${task.everyMinutes} min · ${state}` }),
         el('div', { class: 'role', text: last ? `last run ${when(last.startedAt)}: ${last.status}${last.pageRelPath ? ` → ${last.pageRelPath}` : last.detail ? ` (${last.detail})` : ''}` : 'not run yet' }),
-        el('div', { class: 'entry-actions' }, task.paused ? act('resume', 'Resume') : act('pause', 'Pause'), act('run', 'Run now'), act('delete', 'Delete')))
+        el('div', { class: 'role', text: `prompt: ${task.prompt.length > 120 ? `${task.prompt.slice(0, 120)}…` : task.prompt}` }),
+        el('div', { class: 'entry-actions' }, task.paused || !isArmed ? act('resume', 'Resume') : act('pause', 'Pause'), act('run', 'Run now'), act('delete', 'Delete')))
       item.dataset.taskId = task.id
       item.dataset.lastStatus = last?.status ?? ''
+      item.dataset.armed = String(isArmed)
       return item
     }))
     const form = taskForm(state.dots, async draft => {
@@ -169,7 +174,8 @@ export async function mount(root: HTMLElement, host: PanelHost, now: () => numbe
     }))
     drawer.replaceChildren(head,
       el('h3', { text: `Scheduled work${schedule.running ? ' · running' : ''}` }),
-      el('p', { class: 'hint', text: 'Runs while this panel is open: the Dot answers the prompt and the answer is saved as a page.' }),
+      el('p', { class: 'hint', text: 'While the Dots server is alive, an armed task has its Dot answer the prompt and saves the answer as a page. Tasks read from the project start not armed.' }),
+      ...(schedule.running ? [(() => { const b = el('button', { class: 'small danger', text: 'Cancel running turn' }); b.addEventListener('click', () => { void api.cancelRun().then(renderDrawer) }); return b })()] : []),
       schedule.tasks.length ? tasks : el('div', { class: 'empty', text: 'No scheduled task yet.' }), form,
       el('h3', { text: 'Pages' }), pages.length ? pageList : el('div', { class: 'empty', text: 'No page yet. Save a Dot\'s answer with "Save as page".' }))
   }
